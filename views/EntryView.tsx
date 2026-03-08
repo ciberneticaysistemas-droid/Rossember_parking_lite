@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { CameraFeed } from '../components/CameraFeed';
 import { VehicleCard } from '../components/VehicleCard';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
-import { analyzeImage } from '../services/geminiService';
 import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor } from '../types';
 import { useVoice } from '../hooks/useVoice';
-import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Camera as CameraIcon, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar } from 'lucide-react';
+import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar } from 'lucide-react';
 import { ParkingLayoutMap } from '../components/ParkingLayoutMap';
 
 interface EntryViewProps {
@@ -39,11 +37,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
     const [ownerIdInput, setOwnerIdInput] = useState('');
     const [isAccessibilityMode, setIsAccessibilityMode] = useState(false);
     const [requiresCharging, setRequiresCharging] = useState(false);
-
-    // Manual Input State
-    const [isManualInput, setIsManualInput] = useState(false);
     const [manualPlate, setManualPlate] = useState('');
-
     const [manualType, setManualType] = useState<VehicleType>(VehicleType.CAR);
     const [isSpecialPlate, setIsSpecialPlate] = useState(false);
 
@@ -84,80 +78,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
         }
     };
 
-    const handleCapture = async (imageData: string) => {
-        setErrorMsg(null);
-        setLastProcessed(null);
-
-        if (!ownerIdInput.trim()) {
-            setErrorMsg("⚠️ Por favor ingresa el número de Cédula o Documento antes de escanear.");
-            return;
-        }
-
-        setIsProcessing(true);
-
-        try {
-            const result = await analyzeImage(imageData);
-
-            if (result.detected && result.plate.length >= 4) {
-                // If requiring charging, force type to ELECTRIC if it was detected as CAR
-                let vType = result.vehicleType === VehicleType.UNKNOWN ? VehicleType.CAR : result.vehicleType;
-                if (requiresCharging && vType === VehicleType.CAR) {
-                    vType = VehicleType.ELECTRIC;
-                }
-
-                const specialRate = specialRates.find(r => r.plate === result.plate.toUpperCase() && r.isActive);
-                if (specialRate) {
-                    const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
-                    if (isExpired) {
-                        speak(`Atención. Su mensualidad para la placa ${result.plate} ha vencido. Por favor, acuda a la administración para renovarla.`);
-                        setErrorMsg(`⚠️ La mensualidad para la placa ${result.plate} ha VENCIDO. Se le cobrará tarifa normal.`);
-                    } else {
-                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${result.plate}.`);
-                    }
-                } else {
-                    speak("Vehículo procesado. Bienvenido.");
-                }
-
-                const { record: resultRecord, error: processError } = onProcessEntry(result.plate, vType, ownerIdInput.trim(), imageData, isAccessibilityMode, requiresCharging);
-
-                if (resultRecord) {
-                    const spotStr = resultRecord.spotNumber || 'Asignado';
-                    speak(`Bienvenido a Rossember Parking. Puesto asignado: ${spotStr}`);
-
-                    // Show success feedback
-                    setLastProcessed({
-                        plate: result.plate,
-                        ownerId: ownerIdInput.trim(),
-                        vehicleType: vType,
-                        img: imageData,
-                        timestamp: Date.now(),
-                        isDisabled: isAccessibilityMode,
-                        spotNumber: spotStr,
-                        requiresCharging: requiresCharging,
-                        recordId: resultRecord.id,
-                        specialRate: specialRate || undefined
-                    });
-
-                    // Reset fields
-                    setIsAccessibilityMode(false);
-                    setRequiresCharging(false);
-                    setOwnerIdInput('');
-                    setActiveInput(null);
-                } else {
-                    setErrorMsg(processError || "⚠️ No hay plazas disponibles para este tipo de vehículo.");
-                    speak(processError || "Lo sentimos, no hay plazas disponibles.");
-                }
-            } else {
-                setErrorMsg("La IA de Gemini no detectó una placa clara. Intenta nuevamente o usa el ingreso manual.");
-            }
-        } catch (e) {
-            console.error(e);
-            setErrorMsg("Error procesando la imagen con Gemini. Verifica tu API Key o conexión.");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
     const handleManualSubmit = () => {
         setErrorMsg(null);
         setLastProcessed(null);
@@ -192,7 +112,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
 
         setIsProcessing(true);
         setTimeout(() => {
-            // Adjust type if charging is required
             const finalType = (requiresCharging && manualType === VehicleType.CAR) ? VehicleType.ELECTRIC : manualType;
 
             const specialRate = specialRates.find(r => r.plate === manualPlate.toUpperCase() && r.isActive);
@@ -203,7 +122,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 if (specialRate) {
                     const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
                     if (isExpired) {
-                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido. Por favor, acuda a la administración para renovarla. Puesto asignado: ${spotStr}`);
+                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido. Puesto asignado: ${spotStr}`);
                         setErrorMsg(`⚠️ La mensualidad para la placa ${manualPlate.toUpperCase()} ha VENCIDO. Se le cobrará tarifa normal.`);
                     } else {
                         speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${manualPlate.toUpperCase()}. Puesto asignado: ${spotStr}`);
@@ -283,7 +202,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
             <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
                 <div className="grid lg:grid-cols-12 gap-8">
 
-                    {/* Left: Scanner Section */}
+                    {/* Left: Entry Form */}
                     <section className="lg:col-span-7 space-y-6">
                         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-premium border border-blue-100">
 
@@ -337,130 +256,100 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                 </button>
                             </div>
 
-                            {/* Camera or Manual Input */}
-                            {isManualInput ? (
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 border-2 border-dashed border-blue-300 min-h-[400px] flex flex-col justify-center gap-6">
-                                    <div className="text-center mb-2">
-                                        <div className="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                                            <Keyboard size={32} className="text-white" />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-gray-800">Ingreso Manual</h3>
-                                        <p className="text-sm text-gray-500">Si la cámara no reconoce la placa</p>
+                            {/* Manual Input Form */}
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 border-2 border-dashed border-blue-300 flex flex-col justify-center gap-6">
+                                <div className="text-center mb-2">
+                                    <div className="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                        <Keyboard size={32} className="text-white" />
                                     </div>
+                                    <h3 className="text-xl font-bold text-gray-800">Registro de Placa</h3>
+                                    <p className="text-sm text-gray-500">Ingrese la placa del vehículo manualmente</p>
+                                </div>
 
-                                    {/* Vehicle Type Selector */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setManualType(VehicleType.CAR)}
-                                            className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.CAR
-                                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
-                                                : 'bg-white border-gray-300 text-gray-600 hover:border-blue-300'
-                                                }`}
-                                        >
-                                            <Car size={32} className="mb-2" />
-                                            <span className="text-base font-bold">Carro</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setManualType(VehicleType.MOTORCYCLE)}
-                                            className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.MOTORCYCLE
-                                                ? 'bg-orange-600 border-orange-600 text-white shadow-lg'
-                                                : 'bg-white border-gray-300 text-gray-600 hover:border-orange-300'
-                                                }`}
-                                        >
-                                            <Bike size={32} className="mb-2" />
-                                            <span className="text-base font-bold">Moto</span>
-                                        </button>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
-                                        <input
-                                            type="text"
-                                            value={manualPlate}
-                                            onFocus={() => setActiveInput('manualPlate')}
-                                            onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
-                                            placeholder="AAA123"
-                                            maxLength={7}
-                                            className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-center">
-                                        <button
-                                            onClick={() => setIsSpecialPlate(!isSpecialPlate)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${isSpecialPlate
-                                                ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
-                                                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            <ShieldAlert size={16} />
-                                            {isSpecialPlate ? 'Excepción Activada' : 'Placa Especial / Excepción'}
-                                        </button>
-                                    </div>
-
+                                {/* Vehicle Type Selector */}
+                                <div className="grid grid-cols-2 gap-4">
                                     <button
-                                        onClick={handleManualSubmit}
-                                        disabled={isProcessing}
-                                        className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-blue-600 hover:bg-blue-700"
+                                        type="button"
+                                        onClick={() => setManualType(VehicleType.CAR)}
+                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.CAR
+                                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
+                                            : 'bg-white border-gray-300 text-gray-600 hover:border-blue-300'
+                                            }`}
                                     >
-                                        {isProcessing ? 'Procesando...' : 'Registrar Ingreso'}
+                                        <Car size={32} className="mb-2" />
+                                        <span className="text-base font-bold">Carro</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setManualType(VehicleType.MOTORCYCLE)}
+                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.MOTORCYCLE
+                                            ? 'bg-orange-600 border-orange-600 text-white shadow-lg'
+                                            : 'bg-white border-gray-300 text-gray-600 hover:border-orange-300'
+                                            }`}
+                                    >
+                                        <Bike size={32} className="mb-2" />
+                                        <span className="text-base font-bold">Moto</span>
                                     </button>
                                 </div>
-                            ) : (
-                                <div className="transition-all duration-300 rounded-2xl p-1 relative bg-gradient-to-b from-blue-500 to-blue-300">
-                                    {(isAccessibilityMode || requiresCharging) && (
-                                        <div className="absolute top-0 right-0 left-0 bg-gray-900/80 text-white text-xs font-bold text-center py-2 rounded-t-xl z-10 flex items-center justify-center gap-3 backdrop-blur-sm">
-                                            {isAccessibilityMode && <span className="flex items-center gap-1 text-blue-200"><Accessibility size={12} /> PRIORIDAD</span>}
-                                            {requiresCharging && <span className="flex items-center gap-1 text-green-300"><Zap size={12} /> CARGA EV</span>}
-                                        </div>
-                                    )}
-                                    <CameraFeed onCapture={handleCapture} isProcessing={isProcessing} mode="ENTRY" />
-                                </div>
-                            )}
 
-                            {/* Toggle Button */}
-                            <div className="flex justify-center mt-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
+                                    <input
+                                        type="text"
+                                        value={manualPlate}
+                                        onFocus={() => setActiveInput('manualPlate')}
+                                        onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
+                                        placeholder="AAA123"
+                                        maxLength={7}
+                                        className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
+                                    />
+                                </div>
+
+                                <div className="flex justify-center">
+                                    <button
+                                        onClick={() => setIsSpecialPlate(!isSpecialPlate)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${isSpecialPlate
+                                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                            : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        <ShieldAlert size={16} />
+                                        {isSpecialPlate ? 'Excepción Activada' : 'Placa Especial / Excepción'}
+                                    </button>
+                                </div>
+
                                 <button
-                                    onClick={() => setIsManualInput(!isManualInput)}
-                                    className="text-base font-semibold text-blue-600 hover:text-blue-700 underline flex items-center gap-2 transition-colors"
+                                    onClick={handleManualSubmit}
+                                    disabled={isProcessing}
+                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
                                 >
-                                    {isManualInput ? (
-                                        <><CameraIcon size={20} /> Usar Cámara / Escáner</>
-                                    ) : (
-                                        <><Keyboard size={20} /> Escribir placa manualmente</>
-                                    )}
+                                    {isProcessing ? 'Procesando...' : 'Registrar Ingreso'}
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Error Message */}
-                        {errorMsg && (
-                            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 flex items-start gap-3 text-red-700 animate-pulse shadow-md">
-                                <AlertCircle size={24} className="mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="font-bold text-base">Error de Proceso</p>
-                                    <p className="text-sm opacity-90">{errorMsg}</p>
+                            {/* Error Message */}
+                            {errorMsg && (
+                                <div className="mt-4 bg-red-50 border-2 border-red-200 rounded-2xl p-5 flex items-start gap-3 text-red-700 shadow-md">
+                                    <AlertCircle size={24} className="mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-bold text-base">Error de Proceso</p>
+                                        <p className="text-sm opacity-90">{errorMsg}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </section>
 
-                    {/* Right: Active Vehicles List (HIDDEN FOR PRIVACY as per user request) & Success Feedback */}
+                    {/* Right: Success Feedback & Ads */}
                     <section className="lg:col-span-5 flex flex-col gap-6">
-                        {/* Success Feedback - MOVED HERE */}
+                        {/* Success Feedback */}
                         {lastProcessed && !errorMsg && (
                             <div className="rounded-2xl p-6 border-2 shadow-lg animate-fade-in-up bg-blue-50 border-blue-200 sticky top-8">
                                 <div className="flex flex-col gap-4">
-                                    <div className="w-full h-48 rounded-xl bg-gray-200 overflow-hidden shrink-0 border-2 border-blue-300 shadow-md flex items-center justify-center">
-                                        {lastProcessed.img ? (
-                                            <img src={lastProcessed.img} alt="Capture" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="text-blue-400">
-                                                {lastProcessed.vehicleType === VehicleType.CAR || lastProcessed.vehicleType === VehicleType.ELECTRIC ? <Car size={64} /> : <Bike size={64} />}
-                                            </div>
-                                        )}
+                                    <div className="w-full h-32 rounded-xl bg-blue-100 shrink-0 border-2 border-blue-300 shadow-md flex items-center justify-center">
+                                        <div className="text-blue-400">
+                                            {lastProcessed.vehicleType === VehicleType.CAR || lastProcessed.vehicleType === VehicleType.ELECTRIC ? <Car size={64} /> : <Bike size={64} />}
+                                        </div>
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm font-bold uppercase tracking-wider mb-2 text-blue-600 flex items-center gap-2">
@@ -532,37 +421,33 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* Report Bad Reading Button */}
+                                        {/* Report Bad Entry Button */}
                                         <button
                                             onClick={() => {
                                                 if (lastProcessed.recordId) {
                                                     onCancelEntry(lastProcessed.recordId);
                                                     setManualPlate(lastProcessed.plate);
                                                     setManualType(lastProcessed.vehicleType);
-                                                    setIsManualInput(true);
                                                     setLastProcessed(null);
                                                     setErrorMsg(null);
-                                                    // Optional: speak("Por favor corrija la placa manualmente");
                                                 }
                                             }}
                                             className="mt-4 w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
                                         >
                                             <AlertCircle size={16} />
-                                            REPORTAR MALA LECTURA
+                                            CANCELAR REGISTRO
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Advertisements - MOVED BELOW */}
+                        {/* Advertisements */}
                         {advertisements.length > 0 && (
                             <div className="bg-white rounded-2xl shadow-premium border border-gray-100 p-2">
                                 <AdDisplay ads={advertisements} adTrigger={adTrigger} className="aspect-video w-full rounded-xl" />
                             </div>
                         )}
-
-                        {/* Hidden Active List */}
                     </section>
                 </div>
             </div>

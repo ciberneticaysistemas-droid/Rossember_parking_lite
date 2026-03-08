@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { CameraFeed } from '../components/CameraFeed';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
 import { Toast } from '../components/Toast';
-import { analyzeImage } from '../services/geminiService';
 import { generateInvoice } from '../services/pdfService';
 import { ParkingRecord, VehicleType, SpecialRate } from '../types';
 import { useVoice } from '../hooks/useVoice';
-import { Car, Bike, LogOut, Keyboard, Camera as CameraIcon, FileText, Activity, ArrowLeft, User, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Car, Bike, LogOut, Keyboard, FileText, Activity, ArrowLeft, User, CheckCircle, ShieldAlert } from 'lucide-react';
 
 interface ExitViewProps {
     records: ParkingRecord[];
@@ -24,7 +22,6 @@ interface ExitViewProps {
 export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calculateCost, onBackToSelector, advertisements, adTrigger = 0, gracePeriod = 15, onRevertPayment, clientLogo }) => {
     const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isManualInput, setIsManualInput] = useState(false);
     const [manualPlate, setManualPlate] = useState('');
     const [activeInput, setActiveInput] = useState<'manualPlate' | null>(null);
     const [isSpecialPlate, setIsSpecialPlate] = useState(false);
@@ -56,7 +53,7 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
         }
     };
 
-    const processExitCode = (record: ParkingRecord, currentImage?: string) => {
+    const processExitCode = (record: ParkingRecord) => {
         const { cost, minutes } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled, record.requiresCharging, record.plate);
 
         // 1. Check Grace Period Expiration (If already paid)
@@ -67,7 +64,6 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
             if (timeSincePayment > gracePeriodMs) {
                 const minutesOver = Math.ceil((timeSincePayment - gracePeriodMs) / 60000);
 
-                // Revert payment status to allow new payment
                 if (onRevertPayment) {
                     onRevertPayment(record.id);
                 }
@@ -97,7 +93,6 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
         const mins = minutes % 60;
         const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
 
-        // Process exit
         onProcessExit(record.plate);
         speak("Gracias por su visita, vuelva pronto");
 
@@ -106,7 +101,7 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
             plate: record.plate,
             ownerId: record.ownerId,
             vehicleType: record.vehicleType,
-            img: currentImage || record.imageUrl || '',
+            img: record.imageUrl || '',
             cost: record.cost || cost,
             duration: durationStr,
             timestamp: Date.now(),
@@ -116,35 +111,6 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
         });
 
         setIsProcessing(false);
-    };
-
-    const handleCapture = async (imageData: string) => {
-        setToast(null);
-        setLastProcessed(null);
-        setIsProcessing(true);
-
-        try {
-            const result = await analyzeImage(imageData);
-
-            if (result.detected && result.plate.length >= 4) {
-                const existing = records.find(r => r.plate === result.plate && r.status === 'ACTIVE');
-
-                if (!existing) {
-                    setToast({ message: `⚠️ Vehículo ${result.plate} no encontrado.`, type: 'error' });
-                    setIsProcessing(false);
-                    return;
-                }
-
-                processExitCode(existing, imageData);
-            } else {
-                setToast({ message: "No se detectó placa. Intente de nuevo.", type: 'info' });
-                setIsProcessing(false);
-            }
-        } catch (e) {
-            console.error(e);
-            setToast({ message: "Error de conexión con IA.", type: 'error' });
-            setIsProcessing(false);
-        }
     };
 
     const handleManualSubmit = () => {
@@ -235,92 +201,68 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
                 <div className="grid lg:grid-cols-12 gap-8">
-                    {/* Left: Scanner Section */}
+                    {/* Left: Exit Form */}
                     <section className="lg:col-span-7 space-y-6">
                         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-premium border border-orange-100">
-                            <h2 className="text-xl font-bold text-gray-900 mb-6">Escanear Vehículo de Salida</h2>
+                            <h2 className="text-xl font-bold text-gray-900 mb-6">Verificar Salida de Vehículo</h2>
 
-                            {/* Camera or Manual Input */}
-                            {isManualInput ? (
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 border-2 border-dashed border-orange-300 min-h-[400px] flex flex-col justify-center gap-6">
-                                    <div className="text-center mb-2">
-                                        <div className="bg-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                                            <Keyboard size={32} className="text-white" />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-gray-800">Ingreso Manual de Placa</h3>
-                                        <p className="text-sm text-gray-500">Si la cámara no reconoce la placa</p>
+                            {/* Manual Input Form */}
+                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 border-2 border-dashed border-orange-300 flex flex-col justify-center gap-6">
+                                <div className="text-center mb-2">
+                                    <div className="bg-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                                        <Keyboard size={32} className="text-white" />
                                     </div>
+                                    <h3 className="text-xl font-bold text-gray-800">Ingreso de Placa de Salida</h3>
+                                    <p className="text-sm text-gray-500">Escriba la placa del vehículo que desea salir</p>
+                                </div>
 
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
-                                        <input
-                                            type="text"
-                                            value={manualPlate}
-                                            onFocus={() => setActiveInput('manualPlate')}
-                                            onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
-                                            placeholder="AAA123"
-                                            maxLength={7}
-                                            className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-orange-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
+                                    <input
+                                        type="text"
+                                        value={manualPlate}
+                                        onFocus={() => setActiveInput('manualPlate')}
+                                        onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
+                                        placeholder="AAA123"
+                                        maxLength={7}
+                                        className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-orange-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
+                                    />
+                                </div>
 
-                                    <div className="flex justify-center">
-                                        <button
-                                            onClick={() => setIsSpecialPlate(!isSpecialPlate)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${isSpecialPlate
-                                                ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
-                                                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            <ShieldAlert size={16} />
-                                            {isSpecialPlate ? 'Excepción Activada' : 'Placa Especial / Excepción'}
-                                        </button>
-                                    </div>
-
+                                <div className="flex justify-center">
                                     <button
-                                        onClick={handleManualSubmit}
-                                        disabled={isProcessing}
-                                        className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700"
+                                        onClick={() => setIsSpecialPlate(!isSpecialPlate)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${isSpecialPlate
+                                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                            : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                                            }`}
                                     >
-                                        {isProcessing ? 'Procesando...' : 'Verificar Salida'}
+                                        <ShieldAlert size={16} />
+                                        {isSpecialPlate ? 'Excepción Activada' : 'Placa Especial / Excepción'}
                                     </button>
                                 </div>
-                            ) : (
-                                <div className="transition-all duration-300 rounded-2xl p-1 relative bg-gradient-to-b from-orange-500 to-orange-300">
-                                    <CameraFeed onCapture={handleCapture} isProcessing={isProcessing} mode="EXIT" />
-                                </div>
-                            )}
 
-                            {/* Toggle Button */}
-                            <div className="flex justify-center mt-6">
                                 <button
-                                    onClick={() => setIsManualInput(!isManualInput)}
-                                    className="text-base font-semibold text-orange-600 hover:text-orange-700 underline flex items-center gap-2 transition-colors"
+                                    onClick={handleManualSubmit}
+                                    disabled={isProcessing}
+                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700 disabled:opacity-60"
                                 >
-                                    {isManualInput ? (
-                                        <><CameraIcon size={20} /> Usar Cámara / Escáner</>
-                                    ) : (
-                                        <><Keyboard size={20} /> Escribir placa manualmente</>
-                                    )}
+                                    {isProcessing ? 'Procesando...' : 'Verificar Salida'}
                                 </button>
                             </div>
                         </div>
                     </section>
 
-                    {/* Right: Recent Exits & Success Feedback */}
+                    {/* Right: Success Feedback & Ads */}
                     <section className="lg:col-span-5 flex flex-col gap-6">
                         {/* Success Feedback */}
                         {lastProcessed && (
                             <div className="rounded-2xl p-6 border-2 shadow-lg animate-fade-in-up bg-emerald-50 border-emerald-200 sticky top-8">
                                 <div className="flex flex-col gap-4">
-                                    <div className="w-full h-48 rounded-xl bg-gray-200 overflow-hidden shrink-0 border-2 border-emerald-300 shadow-md flex items-center justify-center">
-                                        {lastProcessed.img ? (
-                                            <img src={lastProcessed.img} alt="Capture" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="text-emerald-400">
-                                                {lastProcessed.vehicleType === VehicleType.CAR ? <Car size={64} /> : <Bike size={64} />}
-                                            </div>
-                                        )}
+                                    <div className="w-full h-32 rounded-xl bg-emerald-100 shrink-0 border-2 border-emerald-300 shadow-md flex items-center justify-center">
+                                        <div className="text-emerald-400">
+                                            {lastProcessed.vehicleType === VehicleType.CAR ? <Car size={64} /> : <Bike size={64} />}
+                                        </div>
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start mb-2">
