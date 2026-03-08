@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, CreditCard, ShieldCheck, Loader2, Smartphone, Building2, Accessibility } from 'lucide-react';
-import { VehicleType } from '../types';
-import { VirtualKeyboard } from './VirtualKeyboard';
+import { X, CreditCard, ShieldCheck, Loader2, Smartphone, Building2, Accessibility, MapPin } from 'lucide-react';
+import { ParkingLayoutMap } from './ParkingLayoutMap';
+import { ParkingRecord, VehicleType } from '../types';
+
 
 interface PaymentModalProps {
   plate: string;
@@ -10,6 +11,7 @@ interface PaymentModalProps {
   cost: number;
   originalCost?: number;
   isDisabled?: boolean;
+  records?: ParkingRecord[];
   onConfirm: (bank: string, email: string) => void;
   onCancel: () => void;
 }
@@ -24,23 +26,24 @@ const BANKS = [
   "Scotiabank Colpatria"
 ];
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ 
-  plate, 
-  vehicleType, 
-  duration, 
-  cost, 
+export const PaymentModal: React.FC<PaymentModalProps> = ({
+  plate,
+  vehicleType,
+  duration,
+  cost,
   originalCost,
   isDisabled,
-  onConfirm, 
-  onCancel 
+  records,
+  onConfirm,
+  onCancel
 }) => {
   const [step, setStep] = useState<'FORM' | 'PROCESSING' | 'SUCCESS'>('FORM');
   const [selectedBank, setSelectedBank] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  
+
   // Keyboard State
-  const [showKeyboard, setShowKeyboard] = useState(false);
+
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +53,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
 
     setStep('PROCESSING');
-    setShowKeyboard(false); // Hide keyboard when processing
-    
+
     // Simulate API delay
     setTimeout(() => {
       setStep('SUCCESS');
@@ -61,18 +63,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }, 2000);
   };
 
-  const handleVirtualKeyPress = (key: string) => {
-    setEmail(prev => prev + key);
-  };
-  
-  const handleVirtualBackspace = () => {
-    setEmail(prev => prev.slice(0, -1));
-  };
+
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all">
-        
+
         {/* Header with PSE Style */}
         <div className="bg-[#0033A0] p-6 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -81,37 +77,37 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button onClick={onCancel} className="absolute top-4 right-4 hover:bg-white/20 p-1 rounded-full transition-colors">
             <X size={20} />
           </button>
-          
+
           <div className="flex items-center gap-2 mb-1">
-             <div className="bg-white text-[#0033A0] font-bold px-2 py-0.5 rounded-sm text-xs tracking-widest border-2 border-white">PSE</div>
-             <span className="text-xs font-light opacity-80">Pagos Seguros en Línea</span>
+            <div className="bg-white text-[#0033A0] font-bold px-2 py-0.5 rounded-sm text-xs tracking-widest border-2 border-white">PSE</div>
+            <span className="text-xs font-light opacity-80">Pagos Seguros en Línea</span>
           </div>
           <h2 className="text-2xl font-bold">Pasarela de Pagos</h2>
           <div className="flex items-center gap-2 mt-1 text-blue-200 text-sm">
-             <span>Ref: {plate} - {vehicleType}</span>
-             {isDisabled && (
-                <span className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-xs text-white">
-                  <Accessibility size={10} /> Prioridad
-                </span>
-             )}
+            <span>Ref: {plate} - {vehicleType}</span>
+            {isDisabled && (
+              <span className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-xs text-white">
+                <Accessibility size={10} /> Prioridad
+              </span>
+            )}
           </div>
         </div>
 
         {step === 'FORM' && (
           <form onSubmit={handlePay} className="p-6 space-y-5">
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex justify-between items-center relative overflow-hidden">
-               {isDisabled && (
-                 <div className="absolute top-2 right-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">
-                    50% DCTO
-                 </div>
-               )}
+              {isDisabled && (
+                <div className="absolute top-2 right-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">
+                  50% DCTO
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Total a Pagar</p>
                 <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-bold text-gray-900">${cost.toLocaleString()}</p>
-                    {originalCost && originalCost > cost && (
-                        <p className="text-sm text-gray-400 line-through">${originalCost.toLocaleString()}</p>
-                    )}
+                  <p className="text-2xl font-bold text-gray-900">${cost.toLocaleString()}</p>
+                  {originalCost && originalCost > cost && (
+                    <p className="text-sm text-gray-400 line-through">${originalCost.toLocaleString()}</p>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -120,14 +116,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             </div>
 
+            {/* Map Visualization */}
+            <div className="space-y-3 p-4 bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden relative">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                  <MapPin size={12} /> Ubicación Exacta
+                </label>
+                <div className="text-[8px] text-slate-500 font-mono">MAP_REF: {plate}</div>
+              </div>
+              <ParkingLayoutMap highlightedSpot={plate} records={records} showOnlyHighlighted={true} />
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setShowKeyboard(true)}
                   placeholder="ejemplo@correo.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-500 cursor-pointer"
                 />
@@ -136,7 +142,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Banco / Billetera</label>
                 <div className="relative">
-                  <select 
+                  <select
                     value={selectedBank}
                     onChange={(e) => setSelectedBank(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none bg-white transition-all text-gray-900"
@@ -154,7 +160,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <div className="pt-2">
-              <button 
+              <button
                 type="submit"
                 className="w-full bg-[#FF004E] hover:bg-[#D90042] text-white font-bold py-3 rounded-xl shadow-lg shadow-pink-500/30 transition-all transform active:scale-95 flex items-center justify-center gap-2"
               >
@@ -194,15 +200,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         )}
       </div>
-      
+
       {/* Keyboard for Modal */}
-      <VirtualKeyboard 
-        isVisible={showKeyboard}
-        onKeyPress={handleVirtualKeyPress}
-        onBackspace={handleVirtualBackspace}
-        onClose={() => setShowKeyboard(false)}
-        zIndex="z-[60]" // Higher than modal
-      />
+
     </div>
   );
 };

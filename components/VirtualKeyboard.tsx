@@ -22,23 +22,26 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
     ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ'],
-    ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '@', '.', '-'] // Added email chars
+    ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '@', '.', '-'] 
   ];
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 bg-slate-900 p-2 pb-6 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] transition-transform duration-300 ${zIndex}`}>
-      <div className="flex justify-end mb-2 px-2">
+    <div className={`fixed bottom-4 right-4 flex flex-col items-end gap-2 ${zIndex} pointer-events-none`}>
+      
+      {/* Close Button - Floating */}
+      <div className="pointer-events-auto pr-2">
         <button 
           onClick={onClose}
-          className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-1 rounded-lg text-sm font-bold flex items-center gap-2"
+          className="bg-neutral-900/80 hover:bg-neutral-800 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg backdrop-blur-md border border-white/10 transition-all"
         >
-          <X size={16} /> Ocultar Teclado
+          <X size={14} /> Ocultar
         </button>
       </div>
       
-      <div className="max-w-4xl mx-auto flex flex-col gap-2 select-none">
+      {/* Keyboard Grid - No Background Container */}
+      <div className="pointer-events-auto p-2 flex flex-col gap-1.5 select-none">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-1.5">
+          <div key={rowIndex} className="flex justify-end gap-1.5">
             {row.map((key) => (
               <button
                 key={key}
@@ -46,7 +49,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                   e.preventDefault();
                   onKeyPress(key);
                 }}
-                className="flex-1 max-w-[45px] h-12 bg-slate-100 hover:bg-white active:bg-blue-100 rounded-lg text-slate-900 font-bold text-lg shadow-sm border-b-2 border-slate-300 active:border-b-0 active:translate-y-[2px] transition-all flex items-center justify-center"
+                className="w-8 h-10 sm:w-10 sm:h-12 md:w-12 md:h-14 bg-neutral-900/90 hover:bg-black text-white rounded-lg font-bold text-sm md:text-lg shadow-md border border-white/10 active:scale-95 active:bg-blue-600 transition-all flex items-center justify-center backdrop-blur-sm"
               >
                 {key}
               </button>
@@ -55,13 +58,13 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
         ))}
         
         {/* Space and Backspace Row */}
-        <div className="flex justify-center gap-1.5 mt-1">
+        <div className="flex justify-end gap-1.5 mt-0.5">
           <button
             onClick={(e) => {
               e.preventDefault();
               onKeyPress(' ');
             }}
-            className="flex-[4] max-w-[300px] h-12 bg-slate-100 hover:bg-white active:bg-blue-100 rounded-lg text-slate-900 font-bold text-sm shadow-sm border-b-2 border-slate-300 active:border-b-0 active:translate-y-[2px] transition-all flex items-center justify-center"
+            className="flex-grow max-w-[300px] h-10 sm:h-12 md:h-14 bg-neutral-900/90 hover:bg-black text-white rounded-lg font-bold text-xs md:text-sm shadow-md border border-white/10 active:scale-95 transition-all flex items-center justify-center backdrop-blur-sm"
           >
             ESPACIO
           </button>
@@ -71,9 +74,9 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
               e.preventDefault();
               onBackspace();
             }}
-            className="flex-[1] max-w-[80px] h-12 bg-red-100 hover:bg-red-50 active:bg-red-200 rounded-lg text-red-600 font-bold shadow-sm border-b-2 border-red-200 active:border-b-0 active:translate-y-[2px] transition-all flex items-center justify-center"
+            className="w-16 sm:w-20 md:w-24 h-10 sm:h-12 md:h-14 bg-red-600/90 hover:bg-red-500 text-white rounded-lg font-bold shadow-md border border-white/10 active:scale-95 transition-all flex items-center justify-center backdrop-blur-sm"
           >
-            <Delete size={24} />
+            <Delete size={20} />
           </button>
         </div>
       </div>

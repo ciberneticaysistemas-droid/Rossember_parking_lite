@@ -1,0 +1,23 @@
+﻿git : POST git-receive-pack (197215 bytes)
+En línea: 1 Carácter: 22
++ git branch -M main ; git push -v -u origin 
+main 2>&1 | Out-File -File ...
++                      
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (P 
+   OST git-receive-pack (197215 bytes):String  
+  ) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandErr 
+   or
+ 
+Pushing to https://github.com/ciberneticaysiste
+mas-droid/Rossember_parking_lite.git
+To https://github.com/ciberneticaysistemas-droi
+d/Rossember_parking_lite.git
+ ! [remote rejected] main -> main (refusing to 
+allow a Personal Access Token to create or 
+update workflow `.github/workflows/deploy.yml` 
+without `workflow` scope)
+error: failed to push some refs to 'https://git
+hub.com/ciberneticaysistemas-droid/Rossember_pa
+rking_lite.git'
