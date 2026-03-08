@@ -106,8 +106,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
         }
 
         if (!ownerIdInput.trim()) {
-            setErrorMsg("⚠️ Por favor ingresa el número de Cédula o Documento.");
-            return;
+            // Document is optional - no hard block, just continue
         }
 
         setIsProcessing(true);
@@ -208,8 +207,11 @@ export const EntryView: React.FC<EntryViewProps> = ({
 
                             {/* Owner ID Input */}
                             <div className="mb-6">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Documento del Propietario *
+                                <label className="block text-sm font-bold text-gray-700 mb-1">
+                                    Documento del Propietario
+                                    <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                        Opcional — recomendado por seguridad
+                                    </span>
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -220,7 +222,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         value={ownerIdInput}
                                         onFocus={() => setActiveInput('ownerId')}
                                         onChange={(e) => setOwnerIdInput(e.target.value)}
-                                        placeholder="Ingrese Cédula o Documento"
+                                        placeholder="Ingrese Cédula o Documento (Opcional)"
                                         className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none text-lg transition-all text-gray-900 placeholder-gray-400 cursor-pointer"
                                     />
                                 </div>
@@ -394,7 +396,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                 return (
                                                     <ParkingLayoutMap
                                                         highlightedSpot={lastProcessed.spotNumber}
-                                                        isEntryAssignment
                                                         records={records}
                                                         floorId={floor?.id}
                                                         floorName={floor?.name}

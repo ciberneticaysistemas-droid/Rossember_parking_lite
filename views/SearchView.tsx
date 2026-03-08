@@ -341,35 +341,12 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
 
                                         {searchResult.paymentStatus !== 'PAID' && currentStats.cost > 0 ? (
                                             <div className="flex flex-col gap-4 w-full md:w-auto mt-4">
-                                                <div className="bg-[#161622] p-4 rounded-xl border border-white/10">
-                                                    <label className="block text-indigo-200/60 text-xs font-bold uppercase mb-2">Confirmar No. Documento</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Ingrese Cédula del Propietario"
-                                                        className="w-full bg-[#1E1E2E] border border-[#36364A] rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-indigo-500 transition-colors text-center font-mono"
-                                                        id="verify-id-input"
-                                                    />
-                                                </div>
-
                                                 <button
-                                                    onClick={() => {
-                                                        const input = document.getElementById('verify-id-input') as HTMLInputElement;
-                                                        const val = input.value.trim();
-                                                        if (!searchResult.ownerId) {
-                                                            alert("Error: Este vehículo no tiene un documento asociado para verificar. Contacte al administrador.");
-                                                            return;
-                                                        }
-                                                        if (val === searchResult.ownerId) {
-                                                            handleInitiatePayment();
-                                                        } else {
-                                                            speak("Documento incorrecto.");
-                                                            alert("El número de documento no coincide con el registrado de ingreso.");
-                                                        }
-                                                    }}
+                                                    onClick={handleInitiatePayment}
                                                     className="w-full px-10 py-5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-2xl font-black text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3"
                                                 >
                                                     <CreditCard size={24} />
-                                                    VERIFICAR Y PAGAR
+                                                    PAGAR AHORA
                                                 </button>
                                             </div>
                                         ) : (

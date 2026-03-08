@@ -96,7 +96,7 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
         onProcessExit(record.plate);
         speak("Gracias por su visita, vuelva pronto");
 
-        setLastProcessed({
+        const processedData = {
             id: record.id,
             plate: record.plate,
             ownerId: record.ownerId,
@@ -108,6 +108,23 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
             isDisabled: record.isDisabled,
             spotNumber: record.spotNumber,
             paymentMethod: record.paymentMethod
+        };
+
+        setLastProcessed(processedData);
+
+        // Auto-generate invoice on exit
+        generateInvoice({
+            id: record.id,
+            plate: record.plate,
+            ownerId: record.ownerId || 'N/A',
+            vehicleType: record.vehicleType,
+            entryTime: record.entryTime,
+            exitTime: processedData.timestamp,
+            durationStr,
+            cost: record.cost || cost,
+            paymentMethod: record.paymentMethod || 'Efectivo',
+            spotNumber: record.spotNumber,
+            isDisabled: record.isDisabled
         });
 
         setIsProcessing(false);
