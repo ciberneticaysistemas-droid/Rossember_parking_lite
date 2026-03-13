@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ParkingRecord, VehicleType } from '../types';
-import { X, Database, Accessibility, MapPin, Settings, FileBarChart, LogOut, Search, Clock, Filter, Car, Bike, Zap, Calendar, MoreVertical } from 'lucide-react';
+import { X, Database, Accessibility, MapPin, Settings, FileBarChart, LogOut, Search, Clock, Filter, Car, Bike, Zap, Calendar, MoreVertical, HardHat } from 'lucide-react';
 import { generateDailyReport } from '../services/pdfService';
 
 interface DatabaseViewProps {
@@ -24,8 +24,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
   // Filter records
   const filteredRecords = useMemo(() => {
     return records.filter(record => {
-      const matchesSearch = record.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (record.spotNumber && record.spotNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesSearch = record.plate.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
 
@@ -122,7 +121,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Buscar placa o puesto..."
+                placeholder="Buscar por placa..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all shadow-lg"
@@ -234,10 +233,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
                   {/* Info Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-slate-50 p-3 rounded-2xl">
-                      <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Ubicación</p>
+                      <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Tipo</p>
                       <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                        <MapPin size={14} className="text-blue-500" />
-                        {record.spotNumber || 'N/A'}
+                        <span className="text-blue-500">•</span>
+                        {record.vehicleType}
                       </div>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-2xl">
@@ -256,18 +255,34 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
                     </div>
                   )}
 
-                  {/* Details if any */}
-                  {record.details && (
-                    <div className="mb-3 text-xs text-slate-500 flex items-center gap-2">
-                      <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
-                      {record.details.make} • {record.details.color}
-                    </div>
-                  )}
 
                   {/* Visual Time Bar */}
                   {record.status === 'ACTIVE' && (
                     <TimeProgressBar entryTime={record.entryTime} />
                   )}
+
+                  {/* Vehicle Condition and Helmet info */}
+                  <div className="mt-4 pt-3 border-t border-slate-50 flex flex-wrap gap-2">
+                    {record.vehicleState && (
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                        record.vehicleState === 'BUENO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        record.vehicleState === 'REGULAR' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {record.vehicleState}
+                      </span>
+                    )}
+                    {record.vehicleType === VehicleType.MOTORCYCLE && record.leavesHelmet && (
+                      <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200 flex items-center gap-1">
+                        <HardHat size={12} /> CASCO
+                      </span>
+                    )}
+                    {record.vehicleComment && (
+                      <div className="w-full text-[10px] text-slate-500 font-medium italic mt-1 line-clamp-1" title={record.vehicleComment}>
+                        "{record.vehicleComment}"
+                      </div>
+                    )}
+                  </div>
 
                 </div>
               ))}

@@ -5,24 +5,26 @@ import { EntryView } from './views/EntryView';
 import { ExitView } from './views/ExitView';
 import { AdminView } from './views/AdminView';
 import { AdminLogin } from './views/AdminLogin';
-import { SearchView } from './views/SearchView';
+import { HomeMenu } from './views/HomeMenu';
+import { AccessView } from './views/AccessView';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { inspectVehicle } from './services/geminiService';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType } from './types';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle } from './types';
 
 // Default Capacity Configuration
 const DEFAULT_CAPACITIES = {
   REGULAR_CAR: 10,
   PRIORITY_CAR: 5,
   MOTO: 5,
-  EV_CHARGING: 5
+  EV_CHARGING: 5,
+  BICYCLE: 10
 };
 
 const DEFAULT_PREFIXES = {
   REGULAR_CAR: 'C',
   PRIORITY_CAR: 'P',
   MOTO: 'M',
-  EV_CHARGING: 'E'
+  EV_CHARGING: 'E',
+  BICYCLE: 'B'
 };
 
 const DEFAULT_FLOORS: Floor[] = [
@@ -37,13 +39,17 @@ const DEFAULT_FLOORS: Floor[] = [
 const DEFAULT_RATES = {
   [VehicleType.CAR]: 85,
   [VehicleType.MOTORCYCLE]: 55,
+  [VehicleType.BICYCLE]: 30,
   [VehicleType.ELECTRIC]: 100,
   [VehicleType.UNKNOWN]: 85,
   'CAR_FULL': 35000,
   'MOTO_FULL': 18000,
+  'BICYCLE_FULL': 8000,
   'EV_CHARGING_RATE': 120,
   'DISABILITY_DISCOUNT_PERCENT': 50,
-  'GRACE_PERIOD_MINUTES': 15
+  'GRACE_PERIOD_MINUTES': 15,
+  'IVA_ENABLED': 0, // 0 = disabled, 1 = enabled
+  'IVA_RATE': 19
 };
 
 // Admin credentials - leídas desde variables de entorno (.env)
@@ -89,30 +95,38 @@ const AppContent: React.FC = () => {
     return DEFAULT_FLOORS;
   });
 
-  const [advertisements, setAdvertisements] = useState<string[]>(() => {
-    const savedAds = localStorage.getItem('parkingAdvertisements');
-    return savedAds ? JSON.parse(savedAds) : [];
-  });
-
   const [specialRates, setSpecialRates] = useState<SpecialRate[]>(() => {
     const saved = localStorage.getItem('specialRates');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [adTrigger, setAdTrigger] = useState(0);
+  const [bannedVehicles, setBannedVehicles] = useState<BannedVehicle[]>(() => {
+    const saved = localStorage.getItem('bannedVehicles');
+    return saved ? JSON.parse(saved) : [];
+  });
+
 
   // Client Customization State
   const [clientLogo, setClientLogo] = useState<string | null>(() => {
     return localStorage.getItem('clientLogo');
   });
 
+  const [printerConfig, setPrinterConfig] = useState<any>(() => {
+    const saved = localStorage.getItem('printerConfig');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   // Derived Total Capacities
-  const totalCapacities = floors.reduce((acc, floor) => ({
-    REGULAR_CAR: acc.REGULAR_CAR + floor.capacities.REGULAR_CAR,
-    PRIORITY_CAR: acc.PRIORITY_CAR + floor.capacities.PRIORITY_CAR,
-    MOTO: acc.MOTO + floor.capacities.MOTO,
-    EV_CHARGING: acc.EV_CHARGING + floor.capacities.EV_CHARGING
-  }), { REGULAR_CAR: 0, PRIORITY_CAR: 0, MOTO: 0, EV_CHARGING: 0 });
+  const totalCapacities = floors.reduce((acc, floor) => {
+    const floorCaps = floor.capacities as any;
+    return {
+      REGULAR_CAR: (acc.REGULAR_CAR === -1 || floorCaps.REGULAR_CAR === -1) ? -1 : acc.REGULAR_CAR + (floorCaps.REGULAR_CAR || 0),
+      PRIORITY_CAR: (acc.PRIORITY_CAR === -1 || floorCaps.PRIORITY_CAR === -1) ? -1 : acc.PRIORITY_CAR + (floorCaps.PRIORITY_CAR || 0),
+      MOTO: (acc.MOTO === -1 || floorCaps.MOTO === -1) ? -1 : acc.MOTO + (floorCaps.MOTO || 0),
+      EV_CHARGING: (acc.EV_CHARGING === -1 || floorCaps.EV_CHARGING === -1) ? -1 : acc.EV_CHARGING + (floorCaps.EV_CHARGING || 0),
+      BICYCLE: (acc.BICYCLE === -1 || floorCaps.BICYCLE === -1) ? -1 : acc.BICYCLE + (floorCaps.BICYCLE || 0)
+    };
+  }, { REGULAR_CAR: 0, PRIORITY_CAR: 0, MOTO: 0, EV_CHARGING: 0, BICYCLE: 0 });
 
   // Persist data
   useEffect(() => {
@@ -127,20 +141,14 @@ const AppContent: React.FC = () => {
     localStorage.setItem('parkingFloors', JSON.stringify(floors));
   }, [floors]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('parkingAdvertisements', JSON.stringify(advertisements));
-    } catch (e) {
-      console.error("Failed to save advertisements to localStorage:", e);
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        alert("⚠️ Memoria llena: No se pudo guardar el anuncio.");
-      }
-    }
-  }, [advertisements]);
 
   useEffect(() => {
     localStorage.setItem('specialRates', JSON.stringify(specialRates));
   }, [specialRates]);
+
+  useEffect(() => {
+    localStorage.setItem('bannedVehicles', JSON.stringify(bannedVehicles));
+  }, [bannedVehicles]);
 
   useEffect(() => {
     if (clientLogo) {
@@ -149,6 +157,14 @@ const AppContent: React.FC = () => {
       localStorage.removeItem('clientLogo');
     }
   }, [clientLogo]);
+
+  useEffect(() => {
+    if (printerConfig) {
+      localStorage.setItem('printerConfig', JSON.stringify(printerConfig));
+    } else {
+      localStorage.removeItem('printerConfig');
+    }
+  }, [printerConfig]);
 
   // Helper Functions
   const getAvailableSpot = (type: VehicleType, isPriority: boolean, requiresCharging: boolean = false): { spot: string, floorId: string } | null => {
@@ -167,27 +183,34 @@ const AppContent: React.FC = () => {
       console.log(`[getAvailableSpot] Revisando ${floor.name} (${floor.id}). Prefijo: ${prefixSuffix}. Caps:`, floorCaps);
 
       if (requiresCharging) {
+        if (floorCaps.EV_CHARGING === -1) return { spot: `AUTO-EV-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, floorId: floor.id };
         for (let i = 1; i <= floorCaps.EV_CHARGING; i++) {
           const spot = `${prefixSuffix}${floorPrefixes.EV_CHARGING}-${i.toString().padStart(3, '0')}`;
           if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
         }
+      } else if (type === VehicleType.BICYCLE) {
+        const bicyCap = (floorCaps as any).BICYCLE ?? 0;
+        if (bicyCap === -1) return { spot: `AUTO-B-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, floorId: floor.id };
+        for (let i = 1; i <= bicyCap; i++) {
+          const spot = `${prefixSuffix}${((floorPrefixes as any).BICYCLE || 'B')}-${i.toString().padStart(3, '0')}`;
+          if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
+        }
       } else if (type === VehicleType.MOTORCYCLE) {
+        if (floorCaps.MOTO === -1) return { spot: `AUTO-M-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, floorId: floor.id };
         for (let i = 1; i <= floorCaps.MOTO; i++) {
           const spot = `${prefixSuffix}${floorPrefixes.MOTO}-${i.toString().padStart(3, '0')}`;
           if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
         }
       } else {
         if (isPriority) {
-          // Check Priority Spots
+          if (floorCaps.PRIORITY_CAR === -1) return { spot: `AUTO-P-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, floorId: floor.id };
           for (let i = 1; i <= floorCaps.PRIORITY_CAR; i++) {
             const spot = `${prefixSuffix}${floorPrefixes.PRIORITY_CAR}-${i.toString().padStart(3, '0')}`;
             if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
           }
-          // Fallback to Regular if Priority is full (Optional, but useful for user experience)
-          // Actually let's keep it strict or the user might be confused why they were given C-001
         }
 
-        // Check Regular Spots
+        if (floorCaps.REGULAR_CAR === -1) return { spot: `AUTO-C-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, floorId: floor.id };
         for (let i = 1; i <= floorCaps.REGULAR_CAR; i++) {
           const spot = `${prefixSuffix}${floorPrefixes.REGULAR_CAR}-${i.toString().padStart(3, '0')}`;
           if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
@@ -203,13 +226,19 @@ const AppContent: React.FC = () => {
     const minutes = Math.ceil((exitTime - entryTime) / 60000);
 
     let minuteRate = requiresCharging ? rates['EV_CHARGING_RATE'] : (rates[type] || rates[VehicleType.CAR]);
-    const fullRateKey = type === VehicleType.MOTORCYCLE ? 'MOTO_FULL' : 'CAR_FULL';
+    const fullRateKey = type === VehicleType.MOTORCYCLE ? 'MOTO_FULL' : type === VehicleType.BICYCLE ? 'BICYCLE_FULL' : 'CAR_FULL';
     const fullRateCap = rates[fullRateKey] || 999999;
 
-    let calculatedCost = Math.max(minutes * minuteRate, minuteRate);
+    const minutesInDay = 1440;
+    const fullDays = Math.floor(minutes / minutesInDay);
+    const remainingMinutes = minutes % minutesInDay;
 
-    if (calculatedCost > fullRateCap) {
-      calculatedCost = fullRateCap;
+    let calculatedCost = fullDays * fullRateCap;
+    
+    if (remainingMinutes > 0 || fullDays === 0) {
+      // Valor proporcional del tiempo restante, mínimo el valor de 1 minuto si no hay días completos
+      const proportionCost = Math.max(remainingMinutes * minuteRate, fullDays === 0 ? minuteRate : 0);
+      calculatedCost += Math.min(proportionCost, fullRateCap);
     }
 
     let totalCost = calculatedCost;
@@ -244,13 +273,22 @@ const AppContent: React.FC = () => {
       }
     }
 
+    // IVA Calculation
+    const ivaEnabled = rates['IVA_ENABLED'] === 1;
+    const ivaRate = rates['IVA_RATE'] || 19;
+    const ivaAmount = ivaEnabled ? Math.round(totalCost * ivaRate / 100) : 0;
+    const finalTotal = totalCost + ivaAmount;
+
     return {
-      cost: totalCost,
+      subtotal: totalCost,
+      iva: ivaAmount,
+      cost: finalTotal,
       originalCost: (isDisabled || specialRate) ? originalCost : undefined,
       minutes,
       exitTime,
       specialRateLabel,
-      specialRate: specialRate || undefined
+      specialRate: specialRate || undefined,
+      ivaRate: ivaEnabled ? ivaRate : 0
     };
   };
 
@@ -259,14 +297,23 @@ const AppContent: React.FC = () => {
     plate: string,
     vehicleType: VehicleType,
     ownerId: string,
-    imageData: string | null,
     isAccessibility: boolean,
-    requiresCharging: boolean = false
+    requiresCharging: boolean = false,
+    vehicleState?: 'BUENO' | 'REGULAR' | 'MALO',
+    vehicleComment?: string,
+    leavesHelmet?: boolean,
+    helmetDescription?: string
   ): { record: ParkingRecord | null, error?: string } => {
     const existing = records.find(r => r.plate === plate && r.status === 'ACTIVE');
     if (existing) {
       return { record: null, error: `El vehículo con placa ${plate} ya se encuentra activo en el parqueadero.` };
     }
+
+    const banned = bannedVehicles.find(v => v.plate.toUpperCase() === plate.toUpperCase());
+    if (banned) {
+      return { record: null, error: `ACCESO DENEGADO: Este vehículo está VETADO. Razón: ${banned.reason}` };
+    }
+
 
     const assignment = getAvailableSpot(vehicleType, isAccessibility, requiresCharging);
     if (!assignment) {
@@ -281,14 +328,16 @@ const AppContent: React.FC = () => {
       floorId: assignment.floorId,
       entryTime: Date.now(),
       status: 'ACTIVE',
-      imageUrl: imageData || undefined,
       isDisabled: isAccessibility,
       spotNumber: assignment.spot,
-      requiresCharging: requiresCharging
+      requiresCharging: requiresCharging,
+      vehicleState: vehicleState,
+      vehicleComment: vehicleComment,
+      leavesHelmet: leavesHelmet,
+      helmetDescription: helmetDescription,
     };
 
     setRecords(prev => [newRecord, ...prev]);
-    setAdTrigger(prev => prev + 1);
     return { record: newRecord };
   };
 
@@ -302,7 +351,25 @@ const AppContent: React.FC = () => {
         const { cost } = calculateCost(r.entryTime, r.vehicleType, r.isDisabled, r.requiresCharging);
         return {
           ...r,
+          status: 'COMPLETED' as const,
           paymentStatus: 'PAID',
+          paymentMethod: paymentMethod,
+          cost: cost,
+          exitTime: Date.now()
+        };
+      }
+      return r;
+    }));
+  };
+
+  // Pago en taquilla: registra costo, método de pago y marca como PAID
+  const handlePayAtBooth = (recordId: string, cost: number, paymentMethod: string) => {
+    setRecords(prev => prev.map(r => {
+      if (r.id === recordId) {
+        return {
+          ...r,
+          status: 'COMPLETED' as const,
+          paymentStatus: 'PAID' as const,
           paymentMethod: paymentMethod,
           cost: cost,
           exitTime: Date.now()
@@ -326,9 +393,9 @@ const AppContent: React.FC = () => {
     }));
   };
 
-  const handleProcessExit = (plate: string) => {
+  const handleProcessExit = (recordId: string) => {
     setRecords(prev => prev.map(r => {
-      if (r.plate === plate && r.status === 'ACTIVE') {
+      if (r.id === recordId && r.status === 'ACTIVE') {
         return {
           ...r,
           exitTime: Date.now(),
@@ -347,20 +414,8 @@ const AppContent: React.FC = () => {
     setFloors(newFloors);
   };
 
-  const handleAddAdvertisement = (ad: string) => {
-    setAdvertisements(prev => [...prev, ad]);
-  };
-
-  const handleRemoveAdvertisement = (index: number) => {
-    setAdvertisements(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleClientLogoUpdate = (logo: string | null) => {
-    setClientLogo(logo);
-  };
-
-  const handleSpecialRatesUpdate = (newRates: SpecialRate[]) => {
-    setSpecialRates(newRates);
+  const handleCapacityUpdate = (newCapacities: any) => {
+    setFloors(prev => prev.map((f, i) => i === 0 ? { ...f, capacities: { ...f.capacities, ...newCapacities } } : f));
   };
 
   const handleManualExit = (id: string) => {
@@ -377,20 +432,6 @@ const AppContent: React.FC = () => {
             paymentStatus: 'PAID',
             paymentMethod: 'Manual - Admin'
           };
-        }
-        return r;
-      }));
-      setAdTrigger(prev => prev + 1);
-    }
-  };
-
-  const handleInspection = async (id: string) => {
-    const record = records.find(r => r.id === id);
-    if (record && record.imageUrl) {
-      const details = await inspectVehicle(record.imageUrl);
-      setRecords(prev => prev.map(r => {
-        if (r.id === id) {
-          return { ...r, details };
         }
         return r;
       }));
@@ -412,68 +453,49 @@ const AppContent: React.FC = () => {
     navigate('/');
   };
 
+  const handleClientLogoUpdate = (logo: string | null) => {
+    setClientLogo(logo);
+  };
+
+  const handleSpecialRatesUpdate = (newRates: SpecialRate[]) => {
+    setSpecialRates(newRates);
+  };
+
+  const handlePurgeRecords = (type: 'all' | 'completed') => {
+    if (type === 'all') {
+      setRecords([]);
+    } else {
+      setRecords(prev => prev.filter(r => r.status === 'ACTIVE'));
+    }
+  };
+
   return (
     <Routes>
-      {/* Main Route - Search/Payment Gateway for Users */}
-      <Route path="/" element={
-        <SearchView
-          records={records}
-          capacities={totalCapacities}
-          rates={rates}
-          onProcessPayment={handleProcessPayment}
-          calculateCost={calculateCost}
-          onBackToSelector={() => navigate('/')}
-          floors={floors}
-          clientLogo={clientLogo}
-        />
-      } />
+      {/* Menu Principal */}
+      <Route path="/" element={<HomeMenu clientLogo={clientLogo} />} />
 
-      {/* Entry Route */}
-      <Route path="/entrada" element={
-        <EntryView
+      <Route path="/acceso" element={
+        <AccessView
           records={records}
           capacities={totalCapacities}
           onProcessEntry={handleProcessEntry}
           onBackToSelector={() => navigate('/')}
-          advertisements={advertisements}
-          adTrigger={adTrigger}
           onCancelEntry={handleCancelEntry}
           clientLogo={clientLogo}
           specialRates={specialRates}
           floors={floors}
-        />
-      } />
-
-      {/* Exit Route */}
-      <Route path="/salida" element={
-        <ExitView
-          records={records}
           onProcessExit={handleProcessExit}
           calculateCost={calculateCost}
-          onBackToSelector={() => navigate('/')}
-          advertisements={advertisements}
-          adTrigger={adTrigger}
           gracePeriod={rates['GRACE_PERIOD_MINUTES'] || 15}
           onRevertPayment={handleRevertPayment}
-          clientLogo={clientLogo}
-        />
-      } />
-
-      {/* Search Route */}
-      <Route path="/buscar" element={
-        <SearchView
-          records={records}
-          capacities={totalCapacities}
+          onPayAtBooth={handlePayAtBooth}
           rates={rates}
-          onProcessPayment={handleProcessPayment}
-          calculateCost={calculateCost}
-          onBackToSelector={() => navigate('/')}
-          floors={floors}
-          clientLogo={clientLogo}
+          printerConfig={printerConfig}
+          ivaEnabled={rates['IVA_ENABLED'] === 1}
+          ivaRate={rates['IVA_RATE'] || 19}
         />
       } />
 
-      {/* Admin Login Route */}
       <Route path="/admin" element={
         isAdminAuthenticated ? (
           <Navigate to="/admin/dashboard" replace />
@@ -490,18 +512,19 @@ const AppContent: React.FC = () => {
             rates={rates}
             capacities={totalCapacities}
             floors={floors}
-            advertisements={advertisements}
             onRateUpdate={handleRateUpdate}
-            onFloorsUpdate={handleFloorsUpdate}
-            onAddAdvertisement={handleAddAdvertisement}
-            onRemoveAdvertisement={handleRemoveAdvertisement}
+            onCapacityUpdate={handleCapacityUpdate}
             onManualExit={handleManualExit}
-            onInspection={handleInspection}
             onBackToSelector={handleAdminLogout}
             clientLogo={clientLogo}
             onUpdateClientLogo={handleClientLogoUpdate}
             specialRates={specialRates}
             onSpecialRatesUpdate={handleSpecialRatesUpdate}
+            printerConfig={printerConfig}
+            onPrinterConfigUpdate={setPrinterConfig}
+            bannedVehicles={bannedVehicles}
+            onBannedVehiclesUpdate={setBannedVehicles}
+            onPurgeRecords={handlePurgeRecords}
           />
         </ProtectedRoute>
       } />
@@ -512,7 +535,6 @@ const AppContent: React.FC = () => {
           onSelectDevice={(device) => {
             if (device === 'ENTRY') navigate('/entrada');
             else if (device === 'EXIT') navigate('/salida');
-            else if (device === 'SEARCH') navigate('/buscar');
           }}
         />
       } />

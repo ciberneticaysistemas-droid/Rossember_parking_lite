@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ParkingMapModal } from '../components/ParkingMapModal';
+
 import { PaymentModal } from '../components/PaymentModal';
 import { Toast } from '../components/Toast';
 import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType } from '../types';
@@ -22,7 +22,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
     const { speak } = useVoice();
     const [searchPlate, setSearchPlate] = useState('');
     const [searchResult, setSearchResult] = useState<ParkingRecord | null>(null);
-    const [showMap, setShowMap] = useState(false);
+
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [pendingPayment, setPendingPayment] = useState<{
         recordId: string;
@@ -148,30 +148,30 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
     const currentStats = searchResult ? calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging, searchResult.plate) : { cost: 0, minutes: 0, specialRateLabel: undefined, specialRate: undefined };
 
     return (
-        <div className="min-h-screen bg-[#1E1E2E] text-white selection:bg-indigo-500 selection:text-white">
+        <div className="min-h-screen bg-[#FFFBF7] text-gray-800 selection:bg-orange-500 selection:text-white">
             {/* Background Gradients */}
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-fuchsia-600/10 rounded-full blur-[100px]"></div>
+                <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[120px]"></div>
+                <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-orange-400/5 rounded-full blur-[100px]"></div>
             </div>
 
             {/* Header */}
-            <div className="relative z-10 pt-8 pb-6 px-6 md:px-12">
+            <div className="relative z-10 pt-8 pb-6 px-6 md:px-12 bg-gradient-to-r from-orange-500 to-orange-600 text-gray-800 shadow-md">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center gap-6">
-                        <div className={`flex items-center justify-center transition-all ${clientLogo ? 'bg-white/5 p-1 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl' : 'p-4 bg-white/5 border border-white/10 rounded-2xl'}`}>
+                        <div className={`flex items-center justify-center transition-all ${clientLogo ? 'bg-white/20 p-1 rounded-xl backdrop-blur-md border border-white/20 shadow-lg' : 'p-4 bg-white/20 border border-white/10 rounded-2xl'}`}>
                             {clientLogo ? (
                                 <img src={clientLogo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-2xl" />
                             ) : (
-                                <Search className="w-8 h-8 text-indigo-400" />
+                                <Search className="w-8 h-8 text-gray-800" />
                             )}
                         </div>
-                        <div className="h-12 w-px bg-white/10 hidden md:block"></div>
+                        <div className="h-12 w-px bg-white/20 hidden md:block"></div>
                         <div>
-                            <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent tracking-tight">
+                            <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight">
                                 Pasarela de Pagos
                             </h1>
-                            <p className="text-indigo-200/50 text-sm font-bold tracking-widest uppercase">
+                            <p className="text-orange-900/60 text-sm font-bold tracking-widest uppercase">
                                 Búsqueda y gestión de ingresos
                             </p>
                         </div>
@@ -182,14 +182,14 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
             {/* Main Content */}
             <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-8 py-8 md:py-12">
 
-                {/* Search Box - Dark Mode Premium */}
-                <div className="bg-[#27273A] p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 relative overflow-hidden mb-10">
+                {/* Search Box - Light Mode Premium */}
+                <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-premium border border-orange-100 relative overflow-hidden mb-10">
                     {/* Decorative Element */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
                     <div className="relative z-10 text-center mb-10">
-                        <h2 className="text-3xl md:text-5xl font-bold text-white mb-3">Encuentra tu Vehículo</h2>
-                        <p className="text-indigo-200/50 text-lg">Ingresa la placa para consultar ubicación y valor</p>
+                        <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-3">Encuentra tu Vehículo</h2>
+                        <p className="text-orange-900/40 text-lg">Ingresa la placa para consultar ubicación y valor</p>
                     </div>
 
                     <div className="relative z-10 max-w-2xl mx-auto">
@@ -201,11 +201,11 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                                 placeholder="PLACA (EJ: ABC123)"
                                 maxLength={7}
-                                className="flex-1 text-center text-3xl sm:text-4xl font-mono font-bold uppercase py-6 px-6 bg-[#161622] border-2 border-[#36364A] rounded-2xl focus:ring-4 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all text-white placeholder-white/10 tracking-wider shadow-inner"
+                                className="flex-1 text-center text-3xl sm:text-4xl font-mono font-bold uppercase py-6 px-6 bg-[#FFFBF7] border-2 border-orange-100 rounded-2xl focus:ring-4 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-all text-gray-800 placeholder-orange-200 tracking-wider shadow-inner"
                             />
                             <button
                                 onClick={handleSearch}
-                                className="w-full sm:w-auto px-10 py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold text-xl transition-all shadow-lg hover:shadow-indigo-500/40 active:scale-95 flex items-center justify-center gap-3"
+                                className="w-full sm:w-auto px-10 py-6 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-bold text-xl transition-all shadow-lg hover:shadow-orange-500/40 active:scale-95 flex items-center justify-center gap-3"
                             >
                                 <Search size={28} />
                                 <span className="hidden sm:inline">Buscar</span>
@@ -219,16 +219,14 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                     <div className="bg-[#27273A] rounded-[2.5rem] border border-white/5 overflow-hidden animate-fade-in-up shadow-2xl">
 
                         {/* Result Header */}
-                        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 md:p-8 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-
-                            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 md:p-8 relative overflow-hidden text-gray-800">
+                             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 font-bold">
                                 <div>
-                                    <p className="text-indigo-100/80 font-semibold mb-1 uppercase tracking-wider text-xs">Vehículo Encontrado</p>
-                                    <h3 className="text-5xl md:text-6xl font-black text-white tracking-tight">{searchResult.plate}</h3>
+                                    <p className="text-orange-950/60 font-semibold mb-1 uppercase tracking-wider text-xs">Vehículo Encontrado</p>
+                                    <h3 className="text-5xl md:text-6xl font-black text-gray-800 tracking-tight">{searchResult.plate}</h3>
                                 </div>
-                                <div className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-lg">
-                                    {searchResult.vehicleType === VehicleType.CAR ? <Car size={48} className="text-white" /> : <Bike size={48} className="text-white" />}
+                                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-lg">
+                                    {searchResult.vehicleType === VehicleType.CAR ? <Car size={48} className="text-gray-800" /> : <Bike size={48} className="text-gray-800" />}
                                 </div>
                             </div>
                         </div>
@@ -288,13 +286,13 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                 </div>
 
                                 {/* Entry Time */}
-                                <div className="bg-[#1E1E2E] p-6 rounded-3xl border border-white/5 flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                        <Clock className="text-blue-500" size={24} />
+                                <div className="bg-white p-6 rounded-3xl border border-orange-100 flex items-center gap-4 shadow-sm">
+                                    <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center">
+                                        <Clock className="text-orange-600" size={24} />
                                     </div>
                                     <div>
-                                        <p className="text-white/40 text-xs font-bold uppercase tracking-wider mb-1">Tiempo Estacionado</p>
-                                        <p className="text-xl font-bold text-white">
+                                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Tiempo Estacionado</p>
+                                        <p className="text-xl font-bold text-gray-800">
                                             {formatDuration(currentStats.minutes)}
                                         </p>
                                     </div>
@@ -302,14 +300,14 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                             </div>
 
                             {/* Payment Section */}
-                            <div className="bg-[#1E1E2E] rounded-3xl p-8 border border-white/5">
+                            <div className="bg-white rounded-3xl p-8 border border-orange-100 shadow-sm">
                                 <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                                     <div className="text-center md:text-left">
                                         <p className="text-white/40 text-sm font-bold uppercase mb-2">Total a Pagar</p>
                                         <div className="flex flex-col gap-1">
                                             {currentStats.specialRateLabel && (
                                                 <div className="space-y-2 mb-3">
-                                                    <div className="flex items-center gap-2 text-indigo-400 font-bold text-[10px] uppercase tracking-wider bg-indigo-500/10 px-2 py-1 rounded-md border border-indigo-500/20 w-fit">
+                                                    <div className="flex items-center gap-2 text-orange-600 font-bold text-[10px] uppercase tracking-wider bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20 w-fit">
                                                         <Info size={12} />
                                                         {currentStats.specialRateLabel}
                                                     </div>
@@ -330,7 +328,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                                 </div>
                                             )}
                                             <div className="flex items-center gap-2">
-                                                <span className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">
+                                                <span className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600">
                                                     ${currentStats.cost.toLocaleString()}
                                                 </span>
                                                 {searchResult.status === 'ACTIVE' && searchResult.paymentStatus !== 'PAID' && (
@@ -343,7 +341,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                             <div className="flex flex-col gap-4 w-full md:w-auto mt-4">
                                                 <button
                                                     onClick={handleInitiatePayment}
-                                                    className="w-full px-10 py-5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-2xl font-black text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3"
+                                                    className="w-full px-10 py-5 bg-orange-600 text-white hover:bg-orange-700 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-3"
                                                 >
                                                     <CreditCard size={24} />
                                                     PAGAR AHORA
@@ -357,14 +355,6 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Map Action */}
-                                <button
-                                    onClick={() => setShowMap(true)}
-                                    className="mt-6 w-full py-4 text-indigo-300 hover:text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 group"
-                                >
-                                    <MapPin size={16} className="group-hover:scale-110 transition-transform" /> Ver ubicación exacta en el mapa
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -390,17 +380,6 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                 />
             )}
 
-            {showMap && searchResult && (
-                <ParkingMapModal
-                    records={records}
-                    capacities={capacities}
-                    onClose={() => setShowMap(false)}
-                    highlightedPlate={searchResult.plate}
-                    allowEdit={false}
-                    floors={floors}
-                    isPublicView={true}
-                />
-            )}
 
             {pendingPayment && (
                 <PaymentModal

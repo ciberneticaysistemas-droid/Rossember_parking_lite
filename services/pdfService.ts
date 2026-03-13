@@ -13,6 +13,8 @@ interface InvoiceData {
   paymentMethod: string;
   spotNumber?: string;
   isDisabled?: boolean;
+  vehicleState?: 'BUENO' | 'REGULAR' | 'MALO';
+  leavesHelmet?: boolean;
 }
 
 const PRIMARY_COLOR = "#1e293b"; // Slate 800
@@ -89,6 +91,21 @@ export const generateInvoice = (data: InvoiceData) => {
   if (data.spotNumber) {
     doc.text("Puesto:", 160, 115);
     doc.text(data.spotNumber, 180, 115);
+  }
+
+  // Row 3
+  if (data.vehicleState) {
+    doc.setFont("helvetica", "normal");
+    doc.text("Estado Veh.:", 25, 136);
+    doc.setFont("helvetica", "bold");
+    doc.text(data.vehicleState, 55, 136);
+  }
+
+  if (data.leavesHelmet) {
+    doc.setFont("helvetica", "normal");
+    doc.text("Casco:", 100, 136);
+    doc.setFont("helvetica", "bold");
+    doc.text("SÍ (En Custodia)", 130, 136);
   }
 
   // -- Financial Table --
@@ -249,10 +266,11 @@ export const generateDailyReport = (records: ParkingRecord[]) => {
   doc.rect(20, yPos, pageWidth - 40, 8, "F");
   doc.setFontSize(8);
   doc.text("Hora Salida", 22, yPos + 5);
-  doc.text("Placa", 50, yPos + 5);
-  doc.text("Tipo", 80, yPos + 5);
-  doc.text("Pago", 110, yPos + 5);
-  doc.text("Puesto", 150, yPos + 5);
+  doc.text("Placa", 45, yPos + 5);
+  doc.text("Tipo", 70, yPos + 5);
+  doc.text("Estado", 95, yPos + 5);
+  doc.text("Casco", 120, yPos + 5);
+  doc.text("Pago", 145, yPos + 5);
   doc.text("Valor", pageWidth - 22, yPos + 5, { align: "right" });
 
   yPos += 14;
@@ -267,10 +285,11 @@ export const generateDailyReport = (records: ParkingRecord[]) => {
 
     const timeStr = new Date(r.exitTime!).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
     doc.text(timeStr, 22, yPos);
-    doc.text(r.plate, 50, yPos);
-    doc.text(r.vehicleType, 80, yPos);
-    doc.text(r.paymentMethod || "PSE", 110, yPos);
-    doc.text(r.spotNumber || "-", 150, yPos);
+    doc.text(r.plate, 45, yPos);
+    doc.text(r.vehicleType, 70, yPos);
+    doc.text(r.vehicleState || "N/A", 95, yPos);
+    doc.text(r.leavesHelmet ? "SÍ" : "NO", 120, yPos);
+    doc.text(r.paymentMethod || "Efectivo", 145, yPos);
     doc.text(`$${(r.cost || 0).toLocaleString()}`, pageWidth - 22, yPos, { align: "right" });
 
     // Light line

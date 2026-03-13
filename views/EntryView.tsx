@@ -1,36 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VehicleCard } from '../components/VehicleCard';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
-import { AdDisplay } from '../components/AdDisplay';
+import { ParkingTicketQR } from '../components/ParkingTicketQR';
+
 import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor } from '../types';
 import { useVoice } from '../hooks/useVoice';
-import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar } from 'lucide-react';
-import { ParkingLayoutMap } from '../components/ParkingLayoutMap';
+import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar, Clock, Star, MessageSquare, HardHat } from 'lucide-react';
+import { PrinterConfig } from '../components/PrinterSettingsModal';
+
 
 interface EntryViewProps {
     records: ParkingRecord[];
-    capacities: { REGULAR_CAR: number; PRIORITY_CAR: number; MOTO: number; EV_CHARGING: number };
-    advertisements: string[];
-    adTrigger?: number;
-    onProcessEntry: (plate: string, vehicleType: VehicleType, ownerId: string, imageData: string | null, isAccessibility: boolean, requiresCharging?: boolean) => { record: ParkingRecord | null, error?: string };
+    capacities: { REGULAR_CAR: number; PRIORITY_CAR: number; MOTO: number; EV_CHARGING: number; BICYCLE: number };
+    onProcessEntry: (
+        plate: string,
+        vehicleType: VehicleType,
+        ownerId: string,
+        isAccessibility: boolean,
+        requiresCharging?: boolean,
+        vehicleState?: 'BUENO' | 'REGULAR' | 'MALO',
+        vehicleComment?: string,
+        leavesHelmet?: boolean,
+        helmetDescription?: string
+    ) => { record: ParkingRecord | null, error?: string };
     onBackToSelector: () => void;
     onCancelEntry: (recordId: string) => void;
     clientLogo?: string | null;
     specialRates: SpecialRate[];
     floors?: Floor[];
+    printerConfig?: PrinterConfig | null;
 }
 
 export const EntryView: React.FC<EntryViewProps> = ({
     records,
     capacities,
-    advertisements,
-    adTrigger = 0,
+
     onProcessEntry,
     onBackToSelector,
     onCancelEntry,
     clientLogo,
     specialRates,
-    floors
+    floors,
+    printerConfig
 }) => {
     const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -41,8 +52,45 @@ export const EntryView: React.FC<EntryViewProps> = ({
     const [manualType, setManualType] = useState<VehicleType>(VehicleType.CAR);
     const [isSpecialPlate, setIsSpecialPlate] = useState(false);
 
+    // Vehicle state & helmet state
+    const [vehicleState, setVehicleState] = useState<'BUENO' | 'REGULAR' | 'MALO'>('BUENO');
+    const [vehicleComment, setVehicleComment] = useState('');
+    const [leavesHelmet, setLeavesHelmet] = useState(false);
+    const [helmetDescription, setHelmetDescription] = useState('');
+
+
+
+    // Real-time clock Colombia
+    const [currentTime, setCurrentTime] = useState('');
+    useEffect(() => {
+        const updateClock = () => {
+            const now = new Date();
+            const colombiaTime = now.toLocaleString('es-CO', {
+                timeZone: 'America/Bogota',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true,
+            });
+            setCurrentTime(colombiaTime);
+        };
+        updateClock();
+        const timer = setInterval(updateClock, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // QR Ticket State
+    const [showTicket, setShowTicket] = useState(false);
+    const [ticketData, setTicketData] = useState<{
+        recordId: string;
+        plate: string;
+        ownerId: string;
+        vehicleType: VehicleType;
+        entryTime: number;
+    } | null>(null);
+
     // Virtual Keyboard State
-    const [activeInput, setActiveInput] = useState<'ownerId' | 'manualPlate' | null>(null);
+    const [activeInput, setActiveInput] = useState<'ownerId' | 'manualPlate' | 'vehicleComment' | 'helmetDescription' | null>(null);
 
     // Feedback State
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -58,15 +106,44 @@ export const EntryView: React.FC<EntryViewProps> = ({
         requiresCharging?: boolean;
         recordId?: string;
         specialRate?: SpecialRate;
+        vehicleState?: 'BUENO' | 'REGULAR' | 'MALO';
+        leavesHelmet?: boolean;
     } | null>(null);
 
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
+    const activeBikes = activeRecords.filter(r => r.vehicleType === VehicleType.BICYCLE).length;
+
+    // Capacity checks
+    const isIndefinite = capacities.REGULAR_CAR === -1 || capacities.MOTO === -1 || capacities.BICYCLE === -1;
+    let totalCap = 0;
+    if (floors && floors.length > 0) {
+        totalCap = floors.reduce((acc, floor) => {
+            const fc = floor.capacities as any;
+            return acc + 
+                (fc.REGULAR_CAR === -1 ? 0 : (fc.REGULAR_CAR || 0)) +
+                (fc.PRIORITY_CAR === -1 ? 0 : (fc.PRIORITY_CAR || 0)) +
+                (fc.MOTO === -1 ? 0 : (fc.MOTO || 0)) +
+                (fc.EV_CHARGING === -1 ? 0 : (fc.EV_CHARGING || 0)) +
+                (fc.BICYCLE === -1 ? 0 : (fc.BICYCLE || 0));
+        }, 0);
+    } else {
+        totalCap = 
+            (capacities.REGULAR_CAR === -1 ? 0 : capacities.REGULAR_CAR) + 
+            (capacities.PRIORITY_CAR === -1 ? 0 : capacities.PRIORITY_CAR) + 
+            (capacities.MOTO === -1 ? 0 : capacities.MOTO) + 
+            (capacities.EV_CHARGING === -1 ? 0 : capacities.EV_CHARGING) + 
+            (capacities.BICYCLE === -1 ? 0 : capacities.BICYCLE);
+    }
 
     const handleVirtualKeyPress = (key: string) => {
         if (activeInput === 'ownerId') {
             setOwnerIdInput(prev => prev + key);
         } else if (activeInput === 'manualPlate') {
             setManualPlate(prev => (prev + key).toUpperCase());
+        } else if (activeInput === 'vehicleComment') {
+            setVehicleComment(prev => prev + key);
+        } else if (activeInput === 'helmetDescription') {
+            setHelmetDescription(prev => prev + key);
         }
     };
 
@@ -75,6 +152,10 @@ export const EntryView: React.FC<EntryViewProps> = ({
             setOwnerIdInput(prev => prev.slice(0, -1));
         } else if (activeInput === 'manualPlate') {
             setManualPlate(prev => prev.slice(0, -1));
+        } else if (activeInput === 'vehicleComment') {
+            setVehicleComment(prev => prev.slice(0, -1));
+        } else if (activeInput === 'helmetDescription') {
+            setHelmetDescription(prev => prev.slice(0, -1));
         }
     };
 
@@ -87,6 +168,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
             return;
         }
 
+
         // Validate Plate
         const validatePlate = (plate: string, type: VehicleType): boolean => {
             if (isSpecialPlate) return true;
@@ -95,6 +177,9 @@ export const EntryView: React.FC<EntryViewProps> = ({
             }
             if (type === VehicleType.MOTORCYCLE) {
                 return /^[A-Z]{3}[0-9]{2}[A-Z]$/.test(plate);
+            }
+            if (type === VehicleType.BICYCLE) {
+                return true; // Bicis pueden tener código alfanumérico libre
             }
             return true;
         };
@@ -105,29 +190,38 @@ export const EntryView: React.FC<EntryViewProps> = ({
             return;
         }
 
-        if (!ownerIdInput.trim()) {
-            // Document is optional - no hard block, just continue
-        }
-
         setIsProcessing(true);
         setTimeout(() => {
             const finalType = (requiresCharging && manualType === VehicleType.CAR) ? VehicleType.ELECTRIC : manualType;
 
+            if (manualType === VehicleType.MOTORCYCLE && false /* leavesHelmet disable */) {
+                // ...
+            }
+
             const specialRate = specialRates.find(r => r.plate === manualPlate.toUpperCase() && r.isActive);
-            const { record: resultRecord, error: processError } = onProcessEntry(manualPlate.toUpperCase(), finalType, ownerIdInput.trim(), null, isAccessibilityMode, requiresCharging);
+            const { record: resultRecord, error: processError } = onProcessEntry(
+                manualPlate.toUpperCase(),
+                finalType,
+                ownerIdInput.trim(),
+                isAccessibilityMode,
+                requiresCharging,
+                vehicleState,
+                vehicleComment.trim(),
+                manualType === VehicleType.MOTORCYCLE ? leavesHelmet : false,
+                manualType === VehicleType.MOTORCYCLE ? helmetDescription.trim() : ''
+            );
 
             if (resultRecord) {
-                const spotStr = resultRecord.spotNumber || 'Asignado';
                 if (specialRate) {
                     const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
                     if (isExpired) {
-                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido. Puesto asignado: ${spotStr}`);
+                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido.`);
                         setErrorMsg(`⚠️ La mensualidad para la placa ${manualPlate.toUpperCase()} ha VENCIDO. Se le cobrará tarifa normal.`);
                     } else {
-                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${manualPlate.toUpperCase()}. Puesto asignado: ${spotStr}`);
+                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${manualPlate.toUpperCase()}.`);
                     }
                 } else {
-                    speak(`Bienvenido a Rossember Parking. Puesto asignado: ${spotStr}`);
+                    speak(`Bienvenido a Rossember Parking.`);
                 }
 
                 setLastProcessed({
@@ -137,17 +231,39 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     img: '',
                     timestamp: Date.now(),
                     isDisabled: isAccessibilityMode,
-                    spotNumber: spotStr,
                     requiresCharging: requiresCharging,
                     recordId: resultRecord.id,
-                    specialRate: specialRate || undefined
+                    specialRate: specialRate || undefined,
+                    vehicleState: vehicleState,
+                    leavesHelmet: manualType === VehicleType.MOTORCYCLE ? leavesHelmet : undefined
                 });
+
+                // Show QR ticket
+                setTicketData({
+                    recordId: resultRecord.id,
+                    plate: manualPlate.toUpperCase(),
+                    ownerId: ownerIdInput.trim(),
+                    vehicleType: finalType,
+                    entryTime: resultRecord.entryTime,
+                });
+                setShowTicket(true);
+
+                // Auto-print if configured
+                if (printerConfig?.autoprint) {
+                    setTimeout(() => {
+                        window.print();
+                    }, 500);
+                }
 
                 // Reset
                 setManualPlate('');
                 setOwnerIdInput('');
                 setIsAccessibilityMode(false);
                 setRequiresCharging(false);
+                setVehicleState('BUENO');
+                setVehicleComment('');
+                setLeavesHelmet(false);
+                setHelmetDescription('');
                 setActiveInput(null);
             } else {
                 setErrorMsg(processError || "⚠️ No hay plazas disponibles o el vehículo ya está registrado.");
@@ -157,10 +273,36 @@ export const EntryView: React.FC<EntryViewProps> = ({
         }, 500);
     };
 
+    const vehicleTypeOptions: { type: VehicleType; label: string; icon: React.ReactNode; color: string }[] = [
+        { type: VehicleType.CAR, label: 'Carro', icon: <Car size={28} />, color: 'orange' },
+        { type: VehicleType.MOTORCYCLE, label: 'Moto', icon: <Bike size={28} />, color: 'orange' },
+        { type: VehicleType.BICYCLE, label: 'Bicicleta', icon: <Bike size={28} />, color: 'orange' },
+    ];
+
+    const stateColors = {
+        BUENO: { active: 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200', inactive: 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50' },
+        REGULAR: { active: 'bg-yellow-500 border-yellow-500 text-white shadow-md shadow-yellow-200', inactive: 'bg-white border-gray-200 text-gray-600 hover:border-yellow-300 hover:bg-yellow-50' },
+        MALO: { active: 'bg-red-600 border-red-600 text-white shadow-md shadow-red-200', inactive: 'bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50' },
+    };
+
     return (
-        <div className={`min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 ${activeInput ? 'pb-96' : 'pb-8'}`}>
+        <div className={`min-h-screen bg-[#FFFBF7] ${activeInput ? 'pb-96' : 'pb-8'}`}>
+            {/* QR Ticket Modal */}
+            {showTicket && ticketData && (
+                <ParkingTicketQR
+                    recordId={ticketData.recordId}
+                    plate={ticketData.plate}
+                    ownerId={ticketData.ownerId}
+                    vehicleType={ticketData.vehicleType}
+                    entryTime={ticketData.entryTime}
+                    onClose={() => setShowTicket(false)}
+                    printerConfig={printerConfig}
+                    spotNumber=""  /* Not used anymore */
+                />
+            )}
+
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-gray-800 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-6">
@@ -182,17 +324,26 @@ export const EntryView: React.FC<EntryViewProps> = ({
                             </div>
                             <div className="h-10 w-px bg-white/20 hidden md:block"></div>
                             <div>
-                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Estación de Entrada</h1>
-                                <p className="text-blue-100 text-sm font-medium opacity-90">Registro de vehículos</p>
+                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-800">Estación de Entrada</h1>
+                                <p className="text-orange-900/60 text-sm font-medium opacity-90">Registro de vehículos · Factura QR automática</p>
                             </div>
                         </div>
-                        <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-xl">
-                            <div className="flex items-center gap-2 mb-1">
-                                <Activity size={18} />
-                                <span className="text-sm font-semibold">Ocupación Actual</span>
+                            <div className="bg-white/20 backdrop-blur-sm px-4 py-3 rounded-xl flex items-center gap-2 min-w-[130px] text-gray-800">
+                                <Clock size={18} className="shrink-0 text-gray-800" />
+                                <div>
+                                    <p className="text-[10px] opacity-80 uppercase tracking-widest font-semibold leading-tight text-orange-900/70">Colombia</p>
+                                    <p className="text-base font-bold leading-tight font-mono">{currentTime}</p>
+                                </div>
                             </div>
-                            <p className="text-3xl font-bold">{activeRecords.length}</p>
-                        </div>
+                            <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-xl text-gray-800">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Activity size={18} className="text-gray-800" />
+                                    <span className="text-sm font-semibold">Ocupación Actual</span>
+                                </div>
+                                <p className="text-3xl font-bold">
+                                    {activeRecords.length} / {isIndefinite ? '∞' : totalCap}
+                                </p>
+                            </div>
                     </div>
                 </div>
             </div>
@@ -205,12 +356,12 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     <section className="lg:col-span-7 space-y-6">
                         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-premium border border-blue-100">
 
-                            {/* Owner ID Input */}
+                            {/* Owner ID Input - OBLIGATORIO */}
                             <div className="mb-6">
                                 <label className="block text-sm font-bold text-gray-700 mb-1">
-                                    Documento del Propietario
-                                    <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                                        Opcional — recomendado por seguridad
+                                    Número de Cédula del Propietario
+                                    <span className="ml-2 text-xs font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200">
+                                        Opcional
                                     </span>
                                 </label>
                                 <div className="relative">
@@ -222,7 +373,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         value={ownerIdInput}
                                         onFocus={() => setActiveInput('ownerId')}
                                         onChange={(e) => setOwnerIdInput(e.target.value)}
-                                        placeholder="Ingrese Cédula o Documento (Opcional)"
+                                        placeholder="Ingrese el número de cédula"
                                         className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none text-lg transition-all text-gray-900 placeholder-gray-400 cursor-pointer"
                                     />
                                 </div>
@@ -252,7 +403,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                 >
                                     <div className="flex items-center gap-2">
                                         <Zap size={20} />
-                                        <span>{requiresCharging ? 'Carga EV ACTIVA' : 'Puesto de carga electricos'}</span>
+                                        <span>{requiresCharging ? 'Carga EV ACTIVA' : 'Puesto de carga'}</span>
                                     </div>
                                     <span className="text-[10px] opacity-80 font-normal leading-tight">(Reserva con empresa autorizada)</span>
                                 </button>
@@ -268,44 +419,43 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                     <p className="text-sm text-gray-500">Ingrese la placa del vehículo manualmente</p>
                                 </div>
 
-                                {/* Vehicle Type Selector */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setManualType(VehicleType.CAR)}
-                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.CAR
-                                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
-                                            : 'bg-white border-gray-300 text-gray-600 hover:border-blue-300'
-                                            }`}
-                                    >
-                                        <Car size={32} className="mb-2" />
-                                        <span className="text-base font-bold">Carro</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setManualType(VehicleType.MOTORCYCLE)}
-                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${manualType === VehicleType.MOTORCYCLE
-                                            ? 'bg-orange-600 border-orange-600 text-white shadow-lg'
-                                            : 'bg-white border-gray-300 text-gray-600 hover:border-orange-300'
-                                            }`}
-                                    >
-                                        <Bike size={32} className="mb-2" />
-                                        <span className="text-base font-bold">Moto</span>
-                                    </button>
+                                {/* Vehicle Type Selector - 3 options */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    {vehicleTypeOptions.map(opt => (
+                                        <button
+                                            key={opt.type}
+                                            type="button"
+                                            onClick={() => setManualType(opt.type)}
+                                            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${manualType === opt.type
+                                                ? `bg-${opt.color}-600 border-${opt.color}-600 text-white shadow-lg`
+                                                : `bg-white border-gray-300 text-gray-600 hover:border-${opt.color}-300`
+                                                }`}
+                                            style={manualType === opt.type ? {
+                                                backgroundColor: opt.color === 'green' ? '#16a34a' : opt.color === 'orange' ? '#ea580c' : '#2563eb',
+                                                borderColor: opt.color === 'green' ? '#16a34a' : opt.color === 'orange' ? '#ea580c' : '#2563eb',
+                                                color: 'white'
+                                            } : {}}
+                                        >
+                                            {opt.icon}
+                                            <span className="text-sm font-bold mt-1">{opt.label}</span>
+                                        </button>
+                                    ))}
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
+                                    <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa / Código</label>
                                     <input
                                         type="text"
                                         value={manualPlate}
                                         onFocus={() => setActiveInput('manualPlate')}
                                         onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
-                                        placeholder="AAA123"
-                                        maxLength={7}
+                                        placeholder={manualType === VehicleType.BICYCLE ? 'BICI-001 o libre' : 'AAA123'}
+                                        maxLength={10}
                                         className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
                                     />
                                 </div>
+
+
 
                                 <div className="flex justify-center">
                                     <button
@@ -320,12 +470,80 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                     </button>
                                 </div>
 
+                                {/* Vehicle State Section */}
+                                <div className="space-y-4 pt-4 border-t border-blue-200">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                                            <Activity size={18} className="text-blue-500" />
+                                            Estado del Vehículo
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {(['BUENO', 'REGULAR', 'MALO'] as const).map((state) => (
+                                                <button
+                                                    key={state}
+                                                    type="button"
+                                                    onClick={() => setVehicleState(state)}
+                                                    className={`py-3 px-4 rounded-xl font-bold border-2 transition-all ${
+                                                        vehicleState === state ? stateColors[state].active : stateColors[state].inactive
+                                                    }`}
+                                                >
+                                                    {state}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 uppercase mb-2 flex items-center gap-2">
+                                            <MessageSquare size={18} className="text-blue-500" />
+                                            Observaciones (Opcional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={vehicleComment}
+                                            onFocus={() => setActiveInput('vehicleComment')}
+                                            onChange={(e) => setVehicleComment(e.target.value)}
+                                            placeholder="Ej: Rayón en puerta derecha"
+                                            className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-gray-800"
+                                        />
+                                    </div>
+
+                                    {manualType === VehicleType.MOTORCYCLE && (
+                                        <div className="p-4 bg-orange-50 border border-orange-200 rounded-2xl space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-orange-600 p-2 rounded-lg">
+                                                      <HardHat size={20} className="text-white" />
+                                                    </div>
+                                                    <span className="font-bold text-gray-800">¿Deja Casco?</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setLeavesHelmet(!leavesHelmet)}
+                                                    className={`w-14 h-8 rounded-full relative transition-all ${leavesHelmet ? 'bg-orange-600' : 'bg-gray-300'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${leavesHelmet ? 'left-7' : 'left-1'}`}></div>
+                                                </button>
+                                            </div>
+                                            {leavesHelmet && (
+                                                <input
+                                                    type="text"
+                                                    value={helmetDescription}
+                                                    onFocus={() => setActiveInput('helmetDescription')}
+                                                    onChange={(e) => setHelmetDescription(e.target.value)}
+                                                    placeholder="Descripción del casco (color, marca...)"
+                                                    className="w-full px-4 py-3 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition-all text-gray-800"
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <button
                                     onClick={handleManualSubmit}
                                     disabled={isProcessing}
-                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 shadow-orange-500/20"
                                 >
-                                    {isProcessing ? 'Procesando...' : 'Registrar Ingreso'}
+                                    {isProcessing ? 'Procesando...' : '✅ Registrar Ingreso'}
                                 </button>
                             </div>
 
@@ -342,32 +560,35 @@ export const EntryView: React.FC<EntryViewProps> = ({
                         </div>
                     </section>
 
-                    {/* Right: Success Feedback & Ads */}
+                    {/* Right: Success Feedback */}
                     <section className="lg:col-span-5 flex flex-col gap-6">
                         {/* Success Feedback */}
                         {lastProcessed && !errorMsg && (
-                            <div className="rounded-2xl p-6 border-2 shadow-lg animate-fade-in-up bg-blue-50 border-blue-200 sticky top-8">
+                            <div className="rounded-2xl p-6 border-2 shadow-lg animate-fade-in-up bg-orange-50 border-orange-200 sticky top-8">
                                 <div className="flex flex-col gap-4">
-                                    <div className="w-full h-32 rounded-xl bg-blue-100 shrink-0 border-2 border-blue-300 shadow-md flex items-center justify-center">
-                                        <div className="text-blue-400">
-                                            {lastProcessed.vehicleType === VehicleType.CAR || lastProcessed.vehicleType === VehicleType.ELECTRIC ? <Car size={64} /> : <Bike size={64} />}
+                                    <div className="w-full h-24 rounded-xl bg-orange-100 shrink-0 border-2 border-orange-300 shadow-md flex items-center justify-center">
+                                        <div className="text-orange-400">
+                                            {lastProcessed.vehicleType === VehicleType.CAR || lastProcessed.vehicleType === VehicleType.ELECTRIC
+                                                ? <Car size={48} />
+                                                : <Bike size={48} />}
                                         </div>
                                     </div>
                                     <div className="flex-1">
-                                        <p className="text-sm font-bold uppercase tracking-wider mb-2 text-blue-600 flex items-center gap-2">
+                                        <p className="text-sm font-bold uppercase tracking-wider mb-2 text-orange-600 flex items-center gap-2">
                                             <CheckCircle size={18} /> Entrada Registrada Exitosamente
                                         </p>
                                         <h3 className="text-5xl font-black text-gray-900 tracking-tight mb-4">{lastProcessed.plate}</h3>
 
                                         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 mb-6">
-                                            <span className="bg-white px-3 py-1 rounded-lg border border-blue-200 font-semibold">
+                                            <span className="bg-white px-3 py-1 rounded-lg border border-orange-200 font-semibold">
                                                 {lastProcessed.vehicleType}
                                             </span>
                                             {lastProcessed.ownerId && (
-                                                <span className="bg-white px-3 py-1 rounded-lg border border-blue-200 flex items-center gap-1">
-                                                    <User size={12} /> {lastProcessed.ownerId}
+                                                <span className="bg-white px-3 py-1 rounded-lg border border-orange-200 flex items-center gap-1">
+                                                    <User size={12} /> C.C. {lastProcessed.ownerId}
                                                 </span>
                                             )}
+
                                             {lastProcessed.specialRate && (
                                                 <div className="w-full mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col gap-1">
                                                     <div className="flex justify-between items-center">
@@ -388,41 +609,51 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                             )}
                                         </div>
 
-                                        {/* Map Visualization */}
-                                        <div className="mb-4">
-                                            {(() => {
-                                                const record = records.find(r => r.id === lastProcessed.recordId);
-                                                const floor = floors?.find(f => f.id === record?.floorId);
-                                                return (
-                                                    <ParkingLayoutMap
-                                                        highlightedSpot={lastProcessed.spotNumber}
-                                                        records={records}
-                                                        floorId={floor?.id}
-                                                        floorName={floor?.name}
-                                                        capacities={floor?.capacities}
-                                                        prefixes={floor?.prefixes}
-                                                    />
-                                                );
-                                            })()}
+                                        <div className="flex flex-wrap gap-2 mb-4">
+                                            {lastProcessed.vehicleState && (
+                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                                                    lastProcessed.vehicleState === 'BUENO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                    lastProcessed.vehicleState === 'REGULAR' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                                    'bg-red-50 text-red-700 border-red-200'
+                                                }`}>
+                                                    Estado: {lastProcessed.vehicleState}
+                                                </span>
+                                            )}
+                                            {lastProcessed.leavesHelmet && (
+                                                <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200 flex items-center gap-1">
+                                                    <HardHat size={12} /> CON CASCO
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {/* Spot Assignment */}
                                         <div className={`p-5 rounded-2xl flex items-center gap-4 ${lastProcessed.requiresCharging
                                             ? 'bg-green-600 text-white shadow-lg shadow-green-200'
                                             : lastProcessed.vehicleType === VehicleType.MOTORCYCLE
                                                 ? 'bg-orange-500 text-white shadow-lg shadow-orange-200'
-                                                : 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                                                : lastProcessed.vehicleType === VehicleType.BICYCLE
+                                                    ? 'bg-green-500 text-white shadow-lg shadow-green-200'
+                                                    : 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                                             }`}>
-                                            <MapPin size={32} className="shrink-0" />
+                                            <CheckCircle size={32} className="shrink-0" />
                                             <div className="leading-tight">
-                                                <p className="text-xs opacity-80 uppercase tracking-widest font-semibold mb-1">Asignación de Puesto</p>
-                                                <p className="font-bold text-2xl">
-                                                    Puesto {lastProcessed.spotNumber}
+                                                <p className="text-xs opacity-80 uppercase tracking-widest font-semibold mb-1">Registro Exitoso</p>
+                                                <p className="font-bold text-xl leading-tight">
+                                                    Vehículo en Parqueadero
                                                 </p>
                                             </div>
                                         </div>
 
-                                        {/* Report Bad Entry Button */}
+                                        {/* Re-show ticket button */}
+                                        {ticketData && (
+                                            <button
+                                                onClick={() => setShowTicket(true)}
+                                                className="mt-3 w-full py-2 bg-orange-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-orange-700 transition-colors"
+                                            >
+                                                🖨️ Ver / Reimprimir Tiquete QR
+                                            </button>
+                                        )}
+
+                                        {/* Cancel Registration Button */}
                                         <button
                                             onClick={() => {
                                                 if (lastProcessed.recordId) {
@@ -431,9 +662,10 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                     setManualType(lastProcessed.vehicleType);
                                                     setLastProcessed(null);
                                                     setErrorMsg(null);
+                                                    setTicketData(null);
                                                 }
                                             }}
-                                            className="mt-4 w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                                            className="mt-3 w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
                                         >
                                             <AlertCircle size={16} />
                                             CANCELAR REGISTRO
@@ -443,12 +675,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                             </div>
                         )}
 
-                        {/* Advertisements */}
-                        {advertisements.length > 0 && (
-                            <div className="bg-white rounded-2xl shadow-premium border border-gray-100 p-2">
-                                <AdDisplay ads={advertisements} adTrigger={adTrigger} className="aspect-video w-full rounded-xl" />
-                            </div>
-                        )}
+
                     </section>
                 </div>
             </div>

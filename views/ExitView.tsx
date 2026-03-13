@@ -1,347 +1,318 @@
-import React, { useState } from 'react';
-import { VirtualKeyboard } from '../components/VirtualKeyboard';
-import { AdDisplay } from '../components/AdDisplay';
-import { Toast } from '../components/Toast';
-import { generateInvoice } from '../services/pdfService';
-import { ParkingRecord, VehicleType, SpecialRate } from '../types';
-import { useVoice } from '../hooks/useVoice';
-import { Car, Bike, LogOut, Keyboard, FileText, Activity, ArrowLeft, User, CheckCircle, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Search, X, CheckCircle, AlertCircle, Clock, MapPin, CreditCard, Banknote, Smartphone, Receipt, Printer, ArrowRight } from 'lucide-react';
+import { ParkingRecord, VehicleType } from '../types';
+import { QRScannerCamera } from '../components/QRScannerCamera';
+import { BoothPaymentModal } from '../components/BoothPaymentModal';
+import { InvoiceTicket } from '../components/InvoiceTicket';
 
 interface ExitViewProps {
-    records: ParkingRecord[];
-    onProcessExit: (plate: string) => void;
-    calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean, plate?: string) => { cost: number; originalCost?: number; minutes: number; exitTime: number; specialRateLabel?: string; specialRate?: SpecialRate };
-    onBackToSelector: () => void;
-    advertisements: string[];
-    adTrigger?: number;
-    gracePeriod?: number;
-    onRevertPayment?: (recordId: string) => void;
-    clientLogo?: string | null;
+  records: ParkingRecord[];
+  onProcessExit: (recordId: string) => void;
+  calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean, plate?: string) => number;
+  gracePeriod: number;
+  onPayAtBooth: (recordId: string, cost: number, paymentMethod: string) => void;
+  onRevertPayment?: (recordId: string) => void;
+  rates: Record<string, number>;
+  ivaEnabled: boolean;
+  ivaRate: number;
+  printerConfig?: { name: string; connected: boolean; autoprint?: boolean } | null;
 }
 
-export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calculateCost, onBackToSelector, advertisements, adTrigger = 0, gracePeriod = 15, onRevertPayment, clientLogo }) => {
-    const { speak } = useVoice();
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [manualPlate, setManualPlate] = useState('');
-    const [activeInput, setActiveInput] = useState<'manualPlate' | null>(null);
-    const [isSpecialPlate, setIsSpecialPlate] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+export const ExitView: React.FC<ExitViewProps> = ({
+  records,
+  onProcessExit,
+  calculateCost,
+  gracePeriod,
+  onPayAtBooth,
+  onRevertPayment,
+  rates,
+  ivaEnabled,
+  ivaRate,
+  printerConfig
+}) => {
+  const [searchValue, setSearchValue] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<ParkingRecord | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    const [lastProcessed, setLastProcessed] = useState<{
-        id?: string;
-        plate: string;
-        ownerId?: string;
-        vehicleType: VehicleType;
-        img: string;
-        cost?: number;
-        duration?: string;
-        timestamp: number;
-        isDisabled?: boolean;
-        spotNumber?: string;
-        paymentMethod?: string;
-    } | null>(null);
-
-    const handleVirtualKeyPress = (key: string) => {
-        if (activeInput === 'manualPlate') {
-            setManualPlate(prev => (prev + key).toUpperCase());
-        }
+  // Real-time clock Colombia
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString('es-CO', {
+        timeZone: 'America/Bogota',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }));
+      setCurrentDate(now.toLocaleDateString('es-CO', {
+        timeZone: 'America/Bogota',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit',
+      }));
     };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    const handleVirtualBackspace = () => {
-        if (activeInput === 'manualPlate') {
-            setManualPlate(prev => prev.slice(0, -1));
+  const activeRecords = records.filter(r => r.status === 'ACTIVE');
+
+  const handleQRResult = (data: string) => {
+    setScanning(false);
+    setErrorMsg(null);
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.v === 'POCHI-PARK-V1' && parsed.id) {
+        const record = activeRecords.find(r => r.id === parsed.id);
+        if (record) {
+          setSelectedRecord(record);
+        } else {
+          // Check if it's already completed for security
+          const completed = records.find(r => r.id === parsed.id && r.status === 'COMPLETED');
+          if (completed) {
+            setErrorMsg("🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida.");
+          } else {
+            setErrorMsg("⚠️ El vehículo no se encuentra activo en el sistema.");
+          }
         }
-    };
-
-    const processExitCode = (record: ParkingRecord) => {
-        const { cost, minutes } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled, record.requiresCharging, record.plate);
-
-        // 1. Check Grace Period Expiration (If already paid)
-        if (record.paymentStatus === 'PAID' && record.exitTime) {
-            const timeSincePayment = Date.now() - record.exitTime;
-            const gracePeriodMs = gracePeriod * 60 * 1000;
-
-            if (timeSincePayment > gracePeriodMs) {
-                const minutesOver = Math.ceil((timeSincePayment - gracePeriodMs) / 60000);
-
-                if (onRevertPayment) {
-                    onRevertPayment(record.id);
-                }
-
-                setToast({
-                    message: `⚠️ Tiempo de gracia excedido por ${minutesOver} min. El estado de pago ha sido revertido. Por favor, diríjase al buscador para pagar el tiempo adicional.`,
-                    type: 'warning'
-                });
-                speak("Tiempo de gracia excedido, por favor realice el pago adicional en el buscador");
-                setIsProcessing(false);
-                return;
-            }
+      } else {
+        setErrorMsg("⚠️ Código QR no válido para este sistema.");
+      }
+    } catch (e) {
+      // If it's not JSON, maybe it's just the plate?
+      const record = activeRecords.find(r => r.plate.toUpperCase() === data.toUpperCase());
+      if (record) {
+        setSelectedRecord(record);
+      } else {
+        const completed = records.find(r => r.plate.toUpperCase() === data.toUpperCase() && r.status === 'COMPLETED');
+        if (completed) {
+          setErrorMsg("🛑 Este vehículo ya completó su estadía y salió del parqueadero.");
+        } else {
+          setErrorMsg("⚠️ Código QR desconocido o no válido.");
         }
+      }
+    }
+  };
 
-        // 2. Verify payment status OR if cost is 0
-        if (record.paymentStatus !== 'PAID' && cost > 0) {
-            setToast({
-                message: `⚠️ El vehículo ${record.plate} NO ha realizado el pago.`,
-                type: 'error'
-            });
-            speak("Vehículo sin pago, por favor diríjase a la caja");
-            setIsProcessing(false);
-            return;
-        }
+  const handleSearch = () => {
+    setErrorMsg(null);
+    const record = activeRecords.find(r => r.plate.toUpperCase() === searchValue.toUpperCase());
+    if (record) {
+      setSelectedRecord(record);
+    } else {
+      setErrorMsg("⚠️ No se encontró un vehículo activo con esa placa.");
+    }
+  };
 
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+  const currentCost = selectedRecord ? calculateCost(
+    selectedRecord.entryTime,
+    selectedRecord.vehicleType,
+    selectedRecord.isDisabled,
+    selectedRecord.requiresCharging,
+    selectedRecord.plate
+  ) : 0;
 
-        onProcessExit(record.plate);
-        speak("Gracias por su visita, vuelva pronto");
+  const durationMs = selectedRecord ? Date.now() - selectedRecord.entryTime : 0;
+  const minutes = Math.floor(durationMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  const durationStr = `${hours}h ${remainingMinutes}m`;
 
-        const processedData = {
-            id: record.id,
-            plate: record.plate,
-            ownerId: record.ownerId,
-            vehicleType: record.vehicleType,
-            img: record.imageUrl || '',
-            cost: record.cost || cost,
-            duration: durationStr,
-            timestamp: Date.now(),
-            isDisabled: record.isDisabled,
-            spotNumber: record.spotNumber,
-            paymentMethod: record.paymentMethod
-        };
+  const isGracePeriod = minutes <= gracePeriod;
 
-        setLastProcessed(processedData);
+  const handleProcessPayment = (recordId: string, finalCost: number, method: string, cashGiven?: number, change?: number) => {
+    if (!selectedRecord) return;
 
-        // Auto-generate invoice on exit
-        generateInvoice({
-            id: record.id,
-            plate: record.plate,
-            ownerId: record.ownerId || 'N/A',
-            vehicleType: record.vehicleType,
-            entryTime: record.entryTime,
-            exitTime: processedData.timestamp,
-            durationStr,
-            cost: record.cost || cost,
-            paymentMethod: record.paymentMethod || 'Efectivo',
-            spotNumber: record.spotNumber,
-            isDisabled: record.isDisabled
-        });
+    // Prepare Invoice Data for the Ticket
+    const subtotal = ivaEnabled ? Math.round(finalCost / (1 + ivaRate / 100)) : finalCost;
+    const ivaAmount = finalCost - subtotal;
 
-        setIsProcessing(false);
-    };
+    setInvoiceData({
+      record: {
+        id: selectedRecord.id,
+        plate: selectedRecord.plate,
+        ownerId: selectedRecord.ownerId,
+        vehicleType: selectedRecord.vehicleType,
+        entryTime: selectedRecord.entryTime,
+        exitTime: Date.now(),
+        vehicleState: selectedRecord.vehicleState,
+        leavesHelmet: selectedRecord.leavesHelmet
+      },
+      cost: finalCost,
+      subtotal,
+      ivaAmount,
+      ivaRate,
+      paymentMethod: method,
+      cashGiven,
+      change
+    });
 
-    const handleManualSubmit = () => {
-        setToast(null);
-        setLastProcessed(null);
+    onPayAtBooth(recordId, finalCost, method);
+    onProcessExit(recordId);
+    setShowPaymentModal(false);
+    setSelectedRecord(null);
+    setSearchValue('');
+  };
 
-        if (!manualPlate.trim()) {
-            setToast({ message: "Escriba la placa.", type: 'warning' });
-            return;
-        }
+  return (
+    <div className="min-h-screen bg-[#FFFBF7] pb-20">
+      {/* QR Scanner MODAL */}
+      {scanning && (
+        <QRScannerCamera 
+          onResult={handleQRResult}
+          onClose={() => setScanning(false)}
+        />
+      )}
 
-        const isValidFormat = /^[A-Z]{3}[0-9]{3}$/.test(manualPlate) || /^[A-Z]{3}[0-9]{2}[A-Z]$/.test(manualPlate);
+      {/* Payment MODAL */}
+      {showPaymentModal && selectedRecord && (
+        <BoothPaymentModal
+          record={selectedRecord}
+          cost={currentCost}
+          duration={durationStr}
+          onConfirm={handleProcessPayment}
+          onClose={() => setShowPaymentModal(false)}
+          ivaEnabled={ivaEnabled}
+          ivaRate={ivaRate}
+        />
+      )}
 
-        if (!isValidFormat && !isSpecialPlate) {
-            setToast({ message: "Formato de placa inválido.", type: 'error' });
-            return;
-        }
-
-        setIsProcessing(true);
-        setTimeout(() => {
-            const existing = records.find(r => r.plate === manualPlate.toUpperCase() && r.status === 'ACTIVE');
-
-            if (!existing) {
-                setToast({ message: `Vehículo ${manualPlate.toUpperCase()} no encontrado.`, type: 'error' });
-                setIsProcessing(false);
-                return;
-            }
-
-            processExitCode(existing);
-            setManualPlate('');
-            setActiveInput(null);
-        }, 500);
-    };
-
-    const handleDownloadInvoice = () => {
-        if (!lastProcessed || !lastProcessed.cost) return;
-
-        generateInvoice({
-            id: lastProcessed.id || 'Unknown',
-            plate: lastProcessed.plate,
-            ownerId: lastProcessed.ownerId || 'N/A',
-            vehicleType: lastProcessed.vehicleType,
-            entryTime: Date.now(),
-            exitTime: lastProcessed.timestamp,
-            durationStr: lastProcessed.duration || '0 min',
-            cost: lastProcessed.cost,
-            paymentMethod: lastProcessed.paymentMethod || 'Efectivo',
-            spotNumber: lastProcessed.spotNumber,
-            isDisabled: lastProcessed.isDisabled
-        });
-    };
-
-    return (
-        <div className={`min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 ${activeInput ? 'pb-96' : 'pb-8'}`}>
-            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className={`flex items-center justify-center transition-all ${clientLogo ? 'bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/20 shadow-lg' : 'bg-white/20 p-3 rounded-xl'}`}>
-                                    {clientLogo ? (
-                                        <img src={clientLogo} alt="Logo" className="h-14 w-auto object-contain filter drop-shadow-sm" />
-                                    ) : (
-                                        <LogOut className="w-8 h-8" />
-                                    )}
-                                </div>
-                                <button
-                                    onClick={onBackToSelector}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors group"
-                                    title="Volver"
-                                >
-                                    <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                                </button>
-                            </div>
-                            <div className="h-10 w-px bg-white/20 hidden md:block"></div>
-                            <div>
-                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Estación de Salida</h1>
-                                <p className="text-orange-100 text-sm font-medium opacity-90">Verificación de Salida</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-gray-800 p-8 shadow-md">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-3xl font-black tracking-tight text-gray-800">Módulo de Salida</h1>
+              <p className="text-orange-900/60 font-medium leading-tight">Escanee el tiquete QR para procesar el pago y la salida</p>
             </div>
-
-            {/* Main Content */}
-            <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-                <div className="grid lg:grid-cols-12 gap-8">
-                    {/* Left: Exit Form */}
-                    <section className="lg:col-span-7 space-y-6">
-                        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-premium border border-orange-100">
-                            <h2 className="text-xl font-bold text-gray-900 mb-6">Verificar Salida de Vehículo</h2>
-
-                            {/* Manual Input Form */}
-                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 border-2 border-dashed border-orange-300 flex flex-col justify-center gap-6">
-                                <div className="text-center mb-2">
-                                    <div className="bg-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                                        <Keyboard size={32} className="text-white" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-gray-800">Ingreso de Placa de Salida</h3>
-                                    <p className="text-sm text-gray-500">Escriba la placa del vehículo que desea salir</p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa</label>
-                                    <input
-                                        type="text"
-                                        value={manualPlate}
-                                        onFocus={() => setActiveInput('manualPlate')}
-                                        onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
-                                        placeholder="AAA123"
-                                        maxLength={7}
-                                        className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-orange-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
-                                    />
-                                </div>
-
-                                <div className="flex justify-center">
-                                    <button
-                                        onClick={() => setIsSpecialPlate(!isSpecialPlate)}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${isSpecialPlate
-                                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
-                                            : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                                            }`}
-                                    >
-                                        <ShieldAlert size={16} />
-                                        {isSpecialPlate ? 'Excepción Activada' : 'Placa Especial / Excepción'}
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={handleManualSubmit}
-                                    disabled={isProcessing}
-                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700 disabled:opacity-60"
-                                >
-                                    {isProcessing ? 'Procesando...' : 'Verificar Salida'}
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Right: Success Feedback & Ads */}
-                    <section className="lg:col-span-5 flex flex-col gap-6">
-                        {/* Success Feedback */}
-                        {lastProcessed && (
-                            <div className="rounded-2xl p-6 border-2 shadow-lg animate-fade-in-up bg-emerald-50 border-emerald-200 sticky top-8">
-                                <div className="flex flex-col gap-4">
-                                    <div className="w-full h-32 rounded-xl bg-emerald-100 shrink-0 border-2 border-emerald-300 shadow-md flex items-center justify-center">
-                                        <div className="text-emerald-400">
-                                            {lastProcessed.vehicleType === VehicleType.CAR ? <Car size={64} /> : <Bike size={64} />}
-                                        </div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p className="text-sm font-bold uppercase tracking-wider mb-2 text-emerald-600 flex items-center gap-2">
-                                                    <CheckCircle size={18} /> Salida Autorizada
-                                                </p>
-                                                <h3 className="text-5xl font-black text-gray-900 tracking-tight">{lastProcessed.plate}</h3>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 mb-6">
-                                            <span className="bg-white px-3 py-1 rounded-lg border border-emerald-200 font-semibold">
-                                                {lastProcessed.vehicleType}
-                                            </span>
-                                            {lastProcessed.ownerId && (
-                                                <span className="bg-white px-3 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
-                                                    <User size={12} /> {lastProcessed.ownerId}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 mb-4">
-                                            <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                                                <p className="text-xs text-gray-500 mb-1">Duración</p>
-                                                <p className="font-bold text-gray-900 flex items-center gap-1"><Activity size={14} /> {lastProcessed.duration || '0 min'}</p>
-                                            </div>
-                                            <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                                                <p className="text-xs text-gray-500 mb-1">Costo Total</p>
-                                                <p className="font-bold text-emerald-600 text-lg">${lastProcessed.cost?.toLocaleString()}</p>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={handleDownloadInvoice}
-                                            className="w-full mt-2 flex items-center justify-center gap-2 py-4 border-2 border-dashed border-emerald-300 text-emerald-700 rounded-xl hover:bg-emerald-100 hover:border-emerald-400 transition-all text-lg font-bold"
-                                        >
-                                            <FileText size={20} />
-                                            Reimprimir Factura
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Advertisements */}
-                        {advertisements.length > 0 && (
-                            <div className="bg-white rounded-2xl shadow-premium border border-gray-100 p-2">
-                                <AdDisplay ads={advertisements} adTrigger={adTrigger} className="aspect-video w-full rounded-xl" />
-                            </div>
-                        )}
-                    </section>
-                </div>
+            
+            {/* Real-time clock Colombia */}
+            <div className="hidden md:flex items-center gap-3 bg-white/20 backdrop-blur-sm px-5 py-3 rounded-xl border border-white/10 text-gray-800">
+              <Clock size={22} className="text-gray-800 shrink-0" />
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-orange-900/70 font-semibold leading-tight">Colombia · Hora Local</p>
+                <p className="font-mono font-bold text-xl leading-tight">{currentTime}</p>
+                <p className="text-xs text-orange-900/60 leading-tight capitalize">{currentDate}</p>
+              </div>
             </div>
-
-            {/* Virtual Keyboard */}
-            <VirtualKeyboard
-                isVisible={activeInput !== null}
-                onKeyPress={handleVirtualKeyPress}
-                onBackspace={handleVirtualBackspace}
-                onClose={() => setActiveInput(null)}
-            />
+          </div>
+          
+          <button 
+            onClick={() => setScanning(true)}
+            className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-4 rounded-2xl font-black flex items-center gap-3 transition-all shadow-lg active:scale-95 text-lg"
+          >
+            <Camera size={24} />
+            ESCANEAR QR
+          </button>
         </div>
-    );
+      </div>
+
+      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
+        {/* Search Bar - Fallback */}
+        <div className="bg-white p-6 rounded-3xl shadow-premium border border-orange-100">
+          <label className="block text-xs font-black text-orange-800 uppercase tracking-widest mb-3 opacity-70">O Búsqueda Manual por Placa</label>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300" size={20} />
+              <input 
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="ABC123"
+                className="w-full pl-12 pr-4 py-4 bg-[#FFF] border-2 border-orange-100 rounded-2xl focus:border-orange-500 outline-none font-bold text-xl tracking-widest text-gray-800 transition-all placeholder-orange-200"
+              />
+            </div>
+            <button 
+              onClick={handleSearch}
+              className="bg-orange-600 text-white px-8 rounded-2xl font-bold hover:bg-orange-700 transition-colors shadow-md shadow-orange-200"
+            >
+              BUSCAR
+            </button>
+          </div>
+          {errorMsg && (
+            <div className="mt-4 flex items-center gap-2 text-red-500 font-bold text-sm bg-red-50 p-3 rounded-xl border border-red-100">
+              <AlertCircle size={18} /> {errorMsg}
+            </div>
+          )}
+        </div>
+
+        {/* Selected Vehicle Info */}
+        {selectedRecord ? (
+          <div className="bg-white rounded-4xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in-up">
+            <div className="bg-orange-600 p-6 flex justify-between items-center text-white">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-3 rounded-2xl">
+                   <ArrowRight className="text-white" size={32} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-white/70 uppercase tracking-widest">Vehículo Seleccionado</p>
+                  <h2 className="text-4xl font-black tracking-widest font-mono">{selectedRecord.plate}</h2>
+                </div>
+              </div>
+              <button onClick={() => setSelectedRecord(null)} className="text-white/70 hover:text-white p-2">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-8">
+              <div className="grid md:grid-cols-2 gap-8 mb-8">
+                {/* Details */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                    <span className="flex items-center gap-2 text-slate-500 font-bold text-sm"><Clock size={16} /> Duración</span>
+                    <span className="text-slate-800 font-black text-lg">{durationStr}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                    <span className="text-slate-500 font-bold text-sm">Cédula Propietario</span>
+                    <span className="text-slate-800 font-black text-lg">{selectedRecord.ownerId || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* Cost Panel */}
+                <div className="bg-orange-500 rounded-3xl p-8 text-white flex flex-col justify-center items-center shadow-xl shadow-orange-200">
+                  <p className="text-xs font-black text-white/70 uppercase tracking-widest mb-2">Total a Pagar</p>
+                  <div className="text-5xl font-black mb-1">
+                    ${currentCost.toLocaleString('es-CO')}
+                  </div>
+                  {isGracePeriod ? (
+                    <div className="bg-white/20 text-white px-4 py-1.5 rounded-full text-xs font-black border border-white/30 flex items-center gap-2">
+                      <CheckCircle size={14} /> TIEMPO DE GRACIA (SIN COSTO)
+                    </div>
+                  ) : (
+                    <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Sujeto a cambios en caja</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action */}
+              <button 
+                onClick={() => isGracePeriod ? handleProcessPayment(selectedRecord.id, 0, 'GRACIA') : setShowPaymentModal(true)}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-6 rounded-3xl text-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl shadow-orange-500/20 active:scale-95"
+              >
+                {isGracePeriod ? 'PROCESAR SALIDA (GRATIS)' : 'SIGUIENTE: COBRO EN CAJA'}
+                <ArrowRight size={28} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-200 opacity-60">
+            <div className="bg-slate-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Camera size={48} className="text-slate-400" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Esperando Escaneo</h3>
+            <p className="text-slate-500 max-w-xs mx-auto text-sm">Utilice el botón de escaneo superior para detectar el tiquete QR del vehículo que desea retirar.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };

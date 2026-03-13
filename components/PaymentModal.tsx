@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, CreditCard, ShieldCheck, Loader2, Building2, Accessibility, MapPin, Banknote, Landmark, CheckCircle } from 'lucide-react';
-import { ParkingLayoutMap } from './ParkingLayoutMap';
+
 import { ParkingRecord, VehicleType } from '../types';
 
 interface PaymentModalProps {

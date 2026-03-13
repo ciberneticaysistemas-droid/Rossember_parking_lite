@@ -129,12 +129,8 @@ export const PlateSearchModal: React.FC<PlateSearchModalProps> = ({ records, onC
 
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                                         <div className="flex items-center gap-2 text-gray-600">
-                                            <MapPin size={16} />
-                                            <span>
-                                                {record.vehicleType === VehicleType.MOTORCYCLE
-                                                    ? 'Recinto Motos'
-                                                    : `Puesto ${record.spotNumber}`}
-                                            </span>
+                                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                            <span>{record.vehicleType}</span>
                                         </div>
 
                                         <div className="flex items-center gap-2 text-gray-600">
