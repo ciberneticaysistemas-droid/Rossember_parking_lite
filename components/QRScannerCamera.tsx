@@ -12,31 +12,68 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
   const scannerId = "qr-reader-container";
   const [status, setStatus] = useState<'starting' | 'scanning' | 'error'>('starting');
   const [errorMsg, setErrorMsg] = useState('');
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
 
   useEffect(() => {
-    startScanner();
+    initScanner();
     return () => {
-      if (qrRef.current && qrRef.current.isScanning) {
-        qrRef.current.stop().catch(console.error);
-      }
+      stopScanner();
     };
   }, []);
 
-  const startScanner = async () => {
+  const stopScanner = async () => {
+    if (qrRef.current && qrRef.current.isScanning) {
+      try {
+        await qrRef.current.stop();
+      } catch (e) {
+        console.warn("Error stopping scanner:", e);
+      }
+    }
+  };
+
+  const initScanner = async () => {
     try {
+      // Get available cameras first
+      const devices = await Html5Qrcode.getCameras();
+      setCameras(devices);
+      
+      if (devices && devices.length > 0) {
+        startScanner(devices[0].id);
+      } else {
+        // Fallback to anonymous facing mode if no device list available
+        startScanner(null);
+      }
+    } catch (err) {
+      console.warn("Detection error, trying default:", err);
+      startScanner(null);
+    }
+  };
+
+  const startScanner = async (deviceId: string | null) => {
+    try {
+      await stopScanner();
+      
       const html5QrCode = new Html5Qrcode(scannerId);
       qrRef.current = html5QrCode;
 
       const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
+        fps: 25, // Aumentado para mayor fluidez y captura más rápida
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          // Aumentamos ligeramente el área de escaneo para que sea más fácil centrar el código
+          const boxSize = Math.floor(minEdge * 0.82);
+          return { width: boxSize, height: boxSize };
+        },
+        aspectRatio: 1.0,
+        disableFlip: false,
       };
 
-      // Intentar primero con cámara trasera, si falla ir a la frontal/por defecto
+      const startWith = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" };
+
       try {
         await html5QrCode.start(
-          { facingMode: "environment" },
+          startWith,
           config,
           (decodedText) => {
             html5QrCode.stop().then(() => {
@@ -45,25 +82,21 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
               onResult(decodedText);
             });
           },
-          () => {} // error callback ignorado para no saturar
+          () => {} 
         );
+        setActiveCameraId(deviceId);
+        setStatus('scanning');
       } catch (e) {
-        console.warn("Fallo cámara environment, intentando cualquier cámara...", e);
-        await html5QrCode.start(
-          { facingMode: "user" },
-          config,
-          (decodedText) => {
-            html5QrCode.stop().then(() => {
-              onResult(decodedText);
-            }).catch(() => {
-              onResult(decodedText);
-            });
-          },
-          () => {}
-        );
+        if (!deviceId) {
+           // If environment failed and no deviceId was specified, try user
+           await html5QrCode.start({ facingMode: "user" }, config, (decodedText) => {
+             html5QrCode.stop().then(() => onResult(decodedText)).catch(() => onResult(decodedText));
+           }, () => {});
+           setStatus('scanning');
+        } else {
+           throw e;
+        }
       }
-
-      setStatus('scanning');
     } catch (err: any) {
       console.error("Error al iniciar escáner:", err);
       setStatus('error');
@@ -75,20 +108,37 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
     }
   };
 
+  const handleSwitchCamera = () => {
+    if (cameras.length < 2) return;
+    const currentIndex = cameras.findIndex(c => c.id === activeCameraId);
+    const nextIndex = (currentIndex + 1) % cameras.length;
+    startScanner(cameras[nextIndex].id);
+  };
+
   return (
     <div className="fixed inset-0 bg-black z-[250] flex flex-col">
       {/* Header */}
-      <div className="bg-black/80 p-4 flex justify-between items-center z-10 relative">
+      <div className="bg-black/80 p-4 flex justify-between items-center z-20 relative">
         <div className="flex items-center gap-2 text-white">
           <Camera size={20} />
-          <span className="font-bold">Escáner QR - Salida</span>
+          <span className="font-bold uppercase tracking-tight text-sm">Escáner QR - Salida</span>
         </div>
-        <button 
-          onClick={onClose} 
-          className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-xl transition-colors"
-        >
-          <X size={22} />
-        </button>
+        <div className="flex items-center gap-2">
+           {cameras.length > 1 && (
+             <button 
+               onClick={handleSwitchCamera}
+               className="text-xs bg-white/20 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-white/30 transition-all border border-white/10"
+             >
+               CAMBIAR CÁMARA
+             </button>
+           )}
+          <button 
+            onClick={onClose} 
+            className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-xl transition-colors"
+          >
+            <X size={22} />
+          </button>
+        </div>
       </div>
 
       {/* Scanner View */}
@@ -96,14 +146,20 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
         <div id={scannerId} className="w-full h-full"></div>
         
         {status === 'error' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black z-20 p-8">
-            <div className="text-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-30 p-8">
+            <div className="text-center bg-gray-900/80 p-8 rounded-[2rem] border border-white/10 backdrop-blur-md">
               <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
-              <p className="text-white font-bold mb-2">Error de Cámara</p>
+              <p className="text-white font-black text-xl mb-2">Error de Cámara</p>
               <p className="text-gray-400 text-sm max-w-xs">{errorMsg}</p>
               <button 
+                onClick={initScanner}
+                className="mt-6 w-full py-4 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg shadow-orange-900/20"
+              >
+                Reintentar
+              </button>
+              <button 
                 onClick={onClose}
-                className="mt-6 px-6 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                className="mt-3 w-full py-2 text-gray-400 text-xs font-bold"
               >
                 Cerrar
               </button>
@@ -115,7 +171,7 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
           <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-white/70 text-sm">Iniciando cámara...</p>
+              <p className="text-white/70 text-sm font-bold animate-pulse">Iniciando sistema óptico...</p>
             </div>
           </div>
         )}
@@ -123,9 +179,9 @@ export const QRScannerCamera: React.FC<QRScannerCameraProps> = ({ onResult, onCl
         {/* Status Text Overlay */}
         {status === 'scanning' && (
           <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none z-10">
-            <div className="inline-flex items-center gap-2 bg-black/60 backdrop-blur-sm border border-white/20 text-white px-4 py-2 rounded-full text-sm font-semibold">
+            <div className="inline-flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl">
               <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-              Apunte al código QR del tiquete
+              Apunte su tiquete a la cámara
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, X, CheckCircle, MapPin, User, Clock } from 'lucide-react';
+import { Printer, X, CheckCircle, User, Clock, Building2 } from 'lucide-react';
+import { DocumentConfig, KeyboardShortcutsConfig } from '../types';
 
 interface ParkingTicketQRProps {
   recordId: string;
@@ -10,10 +11,12 @@ interface ParkingTicketQRProps {
   spotNumber: string;
   entryTime: number;
   onClose: () => void;
-  printerConfig?: { name: string; connected: boolean } | null;
+  printerConfig?: { name: string; connected: boolean; autoprint?: boolean; paperFormat?: string; paperWidth?: number } | null;
+  documentConfig?: DocumentConfig;
+  keyboardShortcuts?: KeyboardShortcutsConfig;
 }
 
-const QR_VERSION = 'POCHI-PARK-V1';
+const QR_VERSION = 'PC-PARK-V1';
 
 export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
   recordId,
@@ -23,33 +26,33 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
   spotNumber,
   entryTime,
   onClose,
-  printerConfig
+  printerConfig,
+  documentConfig,
+  keyboardShortcuts
 }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
-  const qrRef = useRef<SVGSVGElement>(null);
 
-  // QR data encodes all info needed at exit
-  const qrData = JSON.stringify({
-    v: QR_VERSION,
-    id: recordId,
-    plate,
-    ownerId: ownerId || '',
-    vehicleType,
-    entryTime,
-  });
+  // Datos del QR simplificados para que los puntos sean más grandes y fáciles de leer
+  const qrData = `PC1|${recordId}`;
 
   const handlePrint = () => {
     if (!ticketRef.current) return;
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) return;
+    // Determine paper width based on printer format
+    const fmt = printerConfig?.paperFormat;
+    let cssMaxWidth = '310px';
+    let bodyPadding = '16px';
+    if (fmt === 'TICKET') { cssMaxWidth = '220px'; bodyPadding = '10px'; }
+    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '300px'; bodyPadding = '14px'; }
+    else if (fmt === 'HALF') { cssMaxWidth = '390px'; bodyPadding = '20px'; }
+    else if (fmt === 'LETTER') { cssMaxWidth = '740px'; bodyPadding = '30px'; }
 
     // Get the SVG element and its outerHTML - specifically the QR one
     const qrContainer = ticketRef.current.querySelector('.qr-code-container');
     const svgElement = qrContainer ? qrContainer.querySelector('svg') : null;
     const svgHTML = svgElement ? svgElement.outerHTML : '';
 
-    printWindow.document.write(`
+    const content = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -58,10 +61,10 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
-              font-family: 'Inter', monospace;
+              font-family: 'Inter', sans-serif;
               background: white;
-              padding: 16px;
-              max-width: 320px;
+              padding: ${bodyPadding};
+              max-width: ${cssMaxWidth};
               margin: 0 auto;
             }
             .ticket {
@@ -73,7 +76,7 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             }
             .logo-title { font-size: 24px; font-weight: 900; color: #111827; margin-bottom: 4px; }
             .subtitle { font-size: 11px; color: #4b5563; letter-spacing: 0.1em; margin-bottom: 20px; font-weight: bold; }
-            .plate { font-size: 48px; font-weight: 900; letter-spacing: 0.05em; color: #ea580c; margin: 12px 0; font-family: 'Courier New', monospace; line-height: 1; }
+            .plate { font-size: 48px; font-weight: 900; letter-spacing: 0.05em; color: #ea580c; margin: 12px 0; font-family: monospace; line-height: 1; }
             .info-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
             .info-label { color: #6b7280; font-weight: 500; }
             .info-value { font-weight: 800; color: #111827; }
@@ -87,28 +90,79 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             }
           </style>
         </head>
-        <body onload="setTimeout(function(){ window.print(); window.close(); }, 500);">
+        <body onload="window.print();">
           <div class="ticket">
-            <div class="logo-title">🅿 PochiParking</div>
+            <div class="logo-title">🅿 ${documentConfig?.businessName || 'ParkingCore'}</div>
             <div class="subtitle">TIQUETE DE ESTACIONAMIENTO</div>
+            
+            ${documentConfig?.nit ? `<div class="info-row"><span class="info-label">NIT</span><span class="info-value">${documentConfig.nit}</span></div>` : ''}
+            ${documentConfig?.address ? `<div class="info-row"><span class="info-label">Dir</span><span class="info-value">${documentConfig.address}</span></div>` : ''}
+            
             <div class="plate">${plate}</div>
             <div class="info-row"><span class="info-label">Tipo</span><span class="info-value">${vehicleType}</span></div>
             ${ownerId ? `<div class="info-row"><span class="info-label">Cédula</span><span class="info-value">${ownerId}</span></div>` : ''}
-            <div class="info-row"><span class="info-label">Hora Entrada</span><span class="info-value">${new Date(entryTime).toLocaleTimeString('es-CO')}</span></div>
+            <div class="info-row"><span class="info-label">Entrada</span><span class="info-value">${new Date(entryTime).toLocaleTimeString('es-CO')}</span></div>
             <div class="info-row"><span class="info-label">Fecha</span><span class="info-value">${new Date(entryTime).toLocaleDateString('es-CO')}</span></div>
             
             <div class="qr-wrap">
               ${svgHTML}
             </div>
             
-            <div class="footer">Conserve este tiquete.<br>Se requiere para registrar la salida.</div>
+            <div class="footer">${documentConfig?.ticketFooter || 'Conserve este tiquete.<br>Se requiere para registrar la salida.'}</div>
+            ${documentConfig?.legalInfo ? `<div class="hash" style="margin-top: 10px; font-size: 9px;">${documentConfig.legalInfo}</div>` : ''}
             <div class="hash">V: ${QR_VERSION} | ${recordId.substring(0, 8)}</div>
           </div>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(content);
+      doc.close();
+      
+      // Wait for print and cleanup
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
+    }
   };
+
+  // Keyboard Shortcuts for Printing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const printKey = keyboardShortcuts?.printDocument || 'F11';
+        if (e.key === printKey) {
+            e.preventDefault();
+            handlePrint();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [keyboardShortcuts]);
+
+  // Auto-print effect
+  useEffect(() => {
+    if (printerConfig?.autoprint) {
+      setTimeout(() => {
+        handlePrint();
+      }, 800);
+    }
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
@@ -125,11 +179,18 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
         </div>
 
         {/* Ticket Body */}
-        <div ref={ticketRef} className="p-6">
-          <div className="text-center mb-6">
-            <p className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">🅿 PochiParking</p>
-            <h2 className="text-5xl font-black text-orange-600 tracking-widest font-mono line-height-1">{plate}</h2>
-            <p className="text-sm font-bold text-gray-500 mt-2 uppercase tracking-wide">{vehicleType}</p>
+        <div ref={ticketRef} className="p-6 relative">
+          {documentConfig?.showWatermark && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none rotate-12">
+               <Building2 size={250} />
+            </div>
+          )}
+          
+          <div className="text-center mb-6 relative z-10">
+            <p className="text-xs font-black uppercase tracking-widest text-orange-600 mb-1">🅿 {documentConfig?.businessName || 'ParkingCore'}</p>
+            {documentConfig?.nit && <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">NIT: {documentConfig.nit}</p>}
+            <h2 className="text-5xl font-black text-gray-800 tracking-widest font-mono line-height-1 my-4">{plate}</h2>
+            <p className="text-sm font-bold text-gray-500 uppercase tracking-wide">{vehicleType}</p>
           </div>
 
           <div className="space-y-2 mb-6 text-sm">
@@ -166,10 +227,13 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
         <div className="p-4 border-t border-gray-100 space-y-2">
           <button
             onClick={handlePrint}
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-orange-200"
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-orange-200 group relative"
           >
             <Printer size={18} />
             {printerConfig?.connected ? `Imprimir en ${printerConfig.name}` : 'Imprimir / Ver PDF'}
+            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] ml-2 font-black">
+                {keyboardShortcuts?.printDocument || 'F11'}
+            </span>
           </button>
           <button
             onClick={onClose}

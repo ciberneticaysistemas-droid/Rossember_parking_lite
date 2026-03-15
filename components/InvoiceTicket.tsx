@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { Printer, X, CheckSquare, Receipt, DollarSign, Clock, Calendar } from 'lucide-react';
+import { Printer, X, CheckSquare, DollarSign, Clock, Calendar, Building2 } from 'lucide-react';
+import { DocumentConfig, KeyboardShortcutsConfig } from '../types';
 
 interface InvoiceTicketProps {
   record: {
@@ -20,7 +21,9 @@ interface InvoiceTicketProps {
   cashGiven?: number;
   change?: number;
   onClose: () => void;
-  printerConfig?: { name: string; connected: boolean; autoprint?: boolean } | null;
+  printerConfig?: { name: string; connected: boolean; autoprint?: boolean; paperFormat?: string; paperWidth?: number } | null;
+  documentConfig?: DocumentConfig;
+  keyboardShortcuts?: KeyboardShortcutsConfig;
 }
 
 export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
@@ -33,7 +36,9 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
   cashGiven,
   change,
   onClose,
-  printerConfig
+  printerConfig,
+  documentConfig,
+  keyboardShortcuts
 }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
 
@@ -45,10 +50,16 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
     }).replace('COP', '$');
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=450,height=700');
-    if (!printWindow) return;
+    // Determine paper width based on printer format
+    const fmt = printerConfig?.paperFormat;
+    let cssMaxWidth = '380px';
+    let bodyPadding = '20px';
+    if (fmt === 'TICKET') { cssMaxWidth = '220px'; bodyPadding = '10px'; }
+    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '300px'; bodyPadding = '14px'; }
+    else if (fmt === 'HALF') { cssMaxWidth = '390px'; bodyPadding = '20px'; }
+    else if (fmt === 'LETTER') { cssMaxWidth = '740px'; bodyPadding = '30px'; }
 
-    printWindow.document.write(`
+    const content = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -59,8 +70,8 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
             body {
               font-family: 'Inter', sans-serif;
               background: white;
-              padding: 20px;
-              max-width: 380px;
+              padding: ${bodyPadding};
+              max-width: ${cssMaxWidth};
               margin: 0 auto;
               font-size: 13px;
               color: #111;
@@ -98,14 +109,14 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
             }
           </style>
         </head>
-        <body onload="setTimeout(function(){ window.print(); window.close(); }, 700);">
+        <body onload="window.print();">
           <div class="ticket">
             <div class="header">
-              <div class="logo">🅿 PochiParking</div>
-              <div class="legal-info">SISTEMA INTEGRAL DE GESTIÓN DE PARQUEADERO</div>
-              <div class="legal-info">NIT: 860.024.796-6</div>
-              <div class="legal-info">Ak. 1 #20-53, Bogotá, Colombia</div>
-              <div class="legal-info">IVA Responsable: Régimen Simplificado</div>
+              <div class="logo">🅿 ${documentConfig?.businessName || 'ParkingCore'}</div>
+              ${documentConfig?.nit ? `<div class="legal-info">NIT: ${documentConfig.nit}</div>` : ''}
+              ${documentConfig?.address ? `<div class="legal-info">${documentConfig.address}</div>` : ''}
+              ${documentConfig?.phone ? `<div class="legal-info">Tel: ${documentConfig.phone}</div>` : ''}
+              ${documentConfig?.legalInfo ? `<div class="legal-info" style="margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px;">${documentConfig.legalInfo}</div>` : ''}
             </div>
 
             <div class="invoice-title">Factura de Venta</div>
@@ -135,16 +146,53 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
             ` : ''}
 
             <div class="footer">
-              <p>Gracias por su visita al Parqueadero PochiParking.</p>
+              <p>${documentConfig?.invoiceFooter || 'Gracias por su visita al Parqueadero.'}</p>
               <p>Este documento es equivalente a factura.</p>
               <p>Vigile sus objetos personales.</p>
             </div>
           </div>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(content);
+      doc.close();
+      
+      // Wait for print and cleanup
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
+    }
   };
+
+  // Keyboard Shortcuts for Printing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const printKey = keyboardShortcuts?.printDocument || 'F11';
+        if (e.key === printKey) {
+            e.preventDefault();
+            handlePrint();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [keyboardShortcuts]);
 
   // Auto-print effect
   useEffect(() => {
@@ -196,10 +244,13 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
           <div className="space-y-3">
              <button
               onClick={handlePrint}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-orange-200 active:scale-95"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-orange-200 active:scale-95 group relative"
             >
               <Printer size={20} />
               Imprimir Factura
+              <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] ml-2 font-black">
+                {keyboardShortcuts?.printDocument || 'F11'}
+              </span>
             </button>
 
             <button

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Search, MapPin, User, Car, AlertCircle } from 'lucide-react';
 import { ParkingRecord } from '../types';
-import { VirtualKeyboard } from './VirtualKeyboard';
 
 interface VehicleLocatorModalProps {
   records: ParkingRecord[];
@@ -120,13 +119,6 @@ export const VehicleLocatorModal: React.FC<VehicleLocatorModalProps> = ({ record
       </div>
       
       {/* Keyboard for Modal */}
-      <VirtualKeyboard 
-        isVisible={showKeyboard}
-        onKeyPress={handleVirtualKeyPress}
-        onBackspace={handleVirtualBackspace}
-        onClose={() => setShowKeyboard(false)}
-        zIndex="z-[80]" // Higher than modal z-[70]
-      />
     </div>
   );
 };

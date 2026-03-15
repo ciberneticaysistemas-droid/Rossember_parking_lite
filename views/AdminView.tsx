@@ -4,11 +4,18 @@ import { RateSettingsModal } from '../components/RateSettingsModal';
 import { SpecialRatesModal } from '../components/SpecialRatesModal';
 import { PlateSearchModal } from '../components/PlateSearchModal';
 import { GracePeriodModal } from '../components/GracePeriodModal';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, BannedVehicle } from '../types';
-import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette, Accessibility, Zap, Users, History, AlertTriangle, FileText, LogOut, CheckCircle, XCircle, Search, ArrowRight, Lock, Printer, ShieldAlert, Calendar, ChevronRight, X } from 'lucide-react';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, BannedVehicle, DocumentConfig, HardwareScannerConfig, KeyboardShortcutsConfig } from '../types';
+import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette, Accessibility, Zap, Users, History, AlertTriangle, FileText, LogOut, CheckCircle, XCircle, Search, ArrowRight, Lock, Printer, ShieldAlert, Calendar, ChevronRight, X, QrCode, Keyboard, HardHat } from 'lucide-react';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { PrinterSettingsModal, PrinterConfig } from '../components/PrinterSettingsModal';
 import { CapacitySettingsModal } from '../components/CapacitySettingsModal';
+import { HardwareScannerModal } from '../components/HardwareScannerModal';
+import { DocumentCustomizationModal } from '../components/DocumentCustomizationModal';
+import { ParkingTicketQR } from '../components/ParkingTicketQR';
+import { InvoiceTicket } from '../components/InvoiceTicket';
+import { KeyboardShortcutsModal } from '../components/KeyboardShortcutsModal';
+import { HelmetsModal } from '../components/HelmetsModal';
+
 
 interface AdminViewProps {
     records: ParkingRecord[];
@@ -29,6 +36,12 @@ interface AdminViewProps {
     bannedVehicles: BannedVehicle[];
     onBannedVehiclesUpdate: (banned: BannedVehicle[]) => void;
     onPurgeRecords: (type: 'all' | 'completed') => void;
+    hardwareScannerConfig: HardwareScannerConfig;
+    onHardwareScannerConfigUpdate: (config: HardwareScannerConfig) => void;
+    documentConfig: DocumentConfig;
+    onDocumentConfigUpdate: (config: DocumentConfig) => void;
+    keyboardShortcuts: KeyboardShortcutsConfig;
+    onKeyboardShortcutsUpdate: (config: KeyboardShortcutsConfig) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -49,7 +62,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
     onPrinterConfigUpdate,
     bannedVehicles,
     onBannedVehiclesUpdate,
-    onPurgeRecords
+    onPurgeRecords,
+    hardwareScannerConfig,
+    onHardwareScannerConfigUpdate,
+    documentConfig,
+    onDocumentConfigUpdate,
+    keyboardShortcuts,
+    onKeyboardShortcutsUpdate
 }) => {
     const [showDatabase, setShowDatabase] = useState(false);
     const [showRateSettings, setShowRateSettings] = useState(false);
@@ -62,6 +81,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [showBannedModal, setShowBannedModal] = useState(false);
     const [showCapacitySettings, setShowCapacitySettings] = useState(false);
     const [showPurgeModal, setShowPurgeModal] = useState(false);
+    const [showHardwareScannerSettings, setShowHardwareScannerSettings] = useState(false);
+    const [showDocumentSettings, setShowDocumentSettings] = useState(false);
+    const [showKeyboardSettings, setShowKeyboardSettings] = useState(false);
+    const [showHelmets, setShowHelmets] = useState(false);
+    
+    // Reprint State
+    const [reprintRecord, setReprintRecord] = useState<ParkingRecord | null>(null);
+    const [reprintInvoiceData, setReprintInvoiceData] = useState<any | null>(null);
+
 
     // Report State
     const [reportPeriod, setReportPeriod] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
@@ -307,7 +335,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </div>
                             <div>
                                 <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Base de Datos</h3>
-                                <span className="text-[10px] bg-orange-600 text-white font-bold px-2 py-0.5 rounded mt-1 inline-block uppercase tracking-widest">Incluye Buscador</span>
                             </div>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Ver todos los registros, buscar placas, reimprimir recibos y gestionar salidas manuales.</p>
@@ -324,7 +351,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </div>
                             <div>
                                 <h3 className="text-xl font-black text-gray-800 group-hover:text-amber-600 transition-colors">Cierre de Caja</h3>
-                                <span className="text-[10px] bg-amber-600 text-white font-bold px-2 py-0.5 rounded mt-1 inline-block uppercase tracking-widest">Resumen del día</span>
                             </div>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Ver el resumen de ingresos, vehículos atendidos y totales del día actual.</p>
@@ -428,6 +454,72 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Configurar cantidad de espacios para carros, motos y bicis o establecer como ilimitado.</p>
                     </button>
 
+                    {/* 11. Escáner Externo */}
+                    <button
+                        onClick={() => setShowHardwareScannerSettings(true)}
+                        className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
+                                <Keyboard size={24} className="text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Escáner Externo</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Configurar escáner de hardware (QR/Infrarrojo/HID) para agilizar la entrada y salida de vehículos.</p>
+                    </button>
+
+                    {/* 12. Personalización de Documentos */}
+                    <button
+                        onClick={() => setShowDocumentSettings(true)}
+                        className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
+                                <FileText size={24} className="text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tickets y Facturas</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Personalizar información legal, encabezados, pies de página y marcas de agua de sus tiquetes y facturas.</p>
+                    </button>
+
+                    {/* 13. Atajos de Teclado */}
+                    <button
+                        onClick={() => setShowKeyboardSettings(true)}
+                        className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
+                                <Keyboard size={24} className="text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Atajos de Teclado</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Personalizar las teclas de acceso rápido para Entrada y Salida (F2-F10 por defecto). No interfieren con la escritura.</p>
+                    </button>
+
+                    {/* 14. Gestión de Cascos */}
+                    <button
+                        onClick={() => setShowHelmets(true)}
+                        className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
+                                <HardHat size={24} className="text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Cascos en Custodia</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Ver qué motos dejaron casco, con su descripción. Útil para el operario de turno.</p>
+                        {(() => {
+                            const helmetCount = records.filter(r => r.vehicleType === 'Moto' && r.leavesHelmet && r.status === 'ACTIVE').length;
+                            return helmetCount > 0 ? (
+                                <div className="mt-2 flex items-center gap-2 text-orange-600 text-xs font-black">
+                                    <span className="bg-orange-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black">{helmetCount}</span>
+                                    casco{helmetCount !== 1 ? 's' : ''} activo{helmetCount !== 1 ? 's' : ''}
+                                </div>
+                            ) : null;
+                        })()}
+                    </button>
+
+
                     {/* 10. Centro de Mantenimiento */}
                     <button
                         onClick={() => setShowPurgeModal(true)}
@@ -501,10 +593,58 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     onClose={() => setShowDatabase(false)}
                     onOpenSettings={() => setShowRateSettings(true)}
                     onManualExit={onManualExit}
-                    onOpenSearch={() => {
-                        setShowDatabase(false);
-                        setShowPlateSearch(true);
+                    onOpenSearch={onBackToSelector}
+                    onReprintTicket={(record) => setReprintRecord(record)}
+                    onReprintInvoice={(record) => {
+                        // Recalculate invoice data for reprinting
+                        const finalCost = record.cost || 0;
+                        const ivaRateValue = rates['IVA_RATE'] || 19;
+                        const ivaEnabled = rates['IVA_ENABLED'] === 1;
+                        const subtotal = ivaEnabled ? Math.round(finalCost / (1 + ivaRateValue / 100)) : finalCost;
+                        const ivaAmount = finalCost - subtotal;
+
+                        setReprintInvoiceData({
+                            record: {
+                                ...record,
+                                exitTime: record.exitTime || Date.now()
+                            },
+                            cost: finalCost,
+                            subtotal,
+                            ivaAmount,
+                            ivaRate: ivaRateValue,
+                            paymentMethod: record.paymentMethod || 'EFECTIVO'
+                        });
                     }}
+                />
+            )}
+
+            {reprintRecord && (
+                <ParkingTicketQR
+                    recordId={reprintRecord.id}
+                    plate={reprintRecord.plate}
+                    ownerId={reprintRecord.ownerId}
+                    vehicleType={reprintRecord.vehicleType}
+                    entryTime={reprintRecord.entryTime}
+                    onClose={() => setReprintRecord(null)}
+                    printerConfig={printerConfig}
+                    documentConfig={documentConfig}
+                    keyboardShortcuts={keyboardShortcuts}
+                    spotNumber={reprintRecord.spotNumber || ""}
+                />
+            )}
+
+            {reprintInvoiceData && (
+                <InvoiceTicket
+                    record={reprintInvoiceData.record}
+                    cost={reprintInvoiceData.cost}
+                    subtotal={reprintInvoiceData.subtotal}
+                    ivaAmount={reprintInvoiceData.ivaAmount}
+                    ivaRate={reprintInvoiceData.ivaRate}
+                    paymentMethod={reprintInvoiceData.paymentMethod}
+                    onClose={() => setReprintInvoiceData(null)}
+                    printerConfig={printerConfig}
+                    documentConfig={documentConfig}
+                    keyboardShortcuts={keyboardShortcuts}
                 />
             )}
 
@@ -516,6 +656,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         setShowRateSettings(false);
                     }}
                     onCancel={() => setShowRateSettings(false)}
+                />
+            )}
+
+            {showKeyboardSettings && (
+                <KeyboardShortcutsModal
+                    currentConfig={keyboardShortcuts}
+                    onSave={(config) => {
+                        onKeyboardShortcutsUpdate(config);
+                        setShowKeyboardSettings(false);
+                    }}
+                    onClose={() => setShowKeyboardSettings(false)}
                 />
             )}
 
@@ -578,6 +729,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 />
             )}
 
+            {showHardwareScannerSettings && (
+                <HardwareScannerModal
+                    currentConfig={hardwareScannerConfig}
+                    onSave={(config) => {
+                        onHardwareScannerConfigUpdate(config);
+                        setShowHardwareScannerSettings(false);
+                    }}
+                    onClose={() => setShowHardwareScannerSettings(false)}
+                />
+            )}
+
+            {showDocumentSettings && (
+                <DocumentCustomizationModal
+                    currentConfig={documentConfig}
+                    onSave={(config) => {
+                        onDocumentConfigUpdate(config);
+                        setShowDocumentSettings(false);
+                    }}
+                    onClose={() => setShowDocumentSettings(false)}
+                />
+            )}
+
+
             {/* ── CIERRE DE CAJA PROFESIONAL ── */}
             {showCierreCaja && (() => {
                 const now = new Date();
@@ -610,7 +784,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     printWindow.document.write(`
                         <html>
                         <head>
-                            <title>Reporte de Caja - PochiPark</title>
+                            <title>Reporte de Caja - ParkingCore</title>
                             <style>
                                 body { font-family: sans-serif; padding: 40px; color: #333; }
                                 .header { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
@@ -630,7 +804,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <body>
                             <div class="header">
                                 <h1 class="title">REPORTE DE CAJA ${periodLabel}</h1>
-                                <p class="subtitle">PochiPark - Sistema de Gestión de Parqueadero</p>
+                                <p class="subtitle">ParkingCore - Sistema de Gestión de Parqueadero</p>
                                 <p class="subtitle">Fecha de generación: ${new Date().toLocaleString()}</p>
                             </div>
                             
@@ -684,7 +858,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </table>
                             
                             <div class="footer">
-                                Documento generado automáticamente por el sistema PochiPark v1.0
+                                Documento generado automáticamente por el sistema ParkingCore v1.0
                             </div>
                             <script>window.print();</script>
                         </body>
@@ -911,6 +1085,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
             {showPurgeModal && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[3rem] shadow-2xl border border-red-100 w-full max-w-xl overflow-hidden animate-fade-in-up">
@@ -986,6 +1161,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                     </div>
                 </div>
+            )}\n
+            {showHelmets && (
+                <HelmetsModal
+                    records={records}
+                    onClose={() => setShowHelmets(false)}
+                />
             )}
         </div>
     );

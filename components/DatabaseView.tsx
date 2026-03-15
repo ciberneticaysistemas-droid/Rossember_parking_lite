@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ParkingRecord, VehicleType } from '../types';
-import { X, Database, Accessibility, MapPin, Settings, FileBarChart, LogOut, Search, Clock, Filter, Car, Bike, Zap, Calendar, MoreVertical, HardHat } from 'lucide-react';
+import { X, Database, Accessibility, MapPin, Settings, FileBarChart, LogOut, Search, Clock, Filter, Car, Bike, Zap, Calendar, MoreVertical, HardHat, Printer } from 'lucide-react';
 import { generateDailyReport } from '../services/pdfService';
 
 interface DatabaseViewProps {
@@ -9,9 +9,13 @@ interface DatabaseViewProps {
   onOpenSettings: () => void;
   onManualExit: (id: string) => void;
   onOpenSearch: () => void;
+  onReprintTicket: (record: ParkingRecord) => void;
+  onReprintInvoice: (record: ParkingRecord) => void;
 }
 
-export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, onOpenSettings, onManualExit, onOpenSearch }) => {
+export const DatabaseView: React.FC<DatabaseViewProps> = ({ 
+  records, onClose, onOpenSettings, onManualExit, onOpenSearch, onReprintTicket, onReprintInvoice 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | VehicleType | 'ACTIVE' | 'COMPLETED'>('ALL');
 
@@ -219,16 +223,32 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
                         </div>
                       </div>
                     </div>
-                    {record.status === 'ACTIVE' && (
+                    <div className="flex items-center gap-2">
+                      {record.status === 'ACTIVE' && (
+                        <button
+                          onClick={() => handleForceExit(record.id, record.plate)}
+                          className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                          title="Forzar Salida"
+                        >
+                          <LogOut size={18} />
+                        </button>
+                      )}
+                      
+                      {/* Reprint Button */}
                       <button
-                        onClick={() => handleForceExit(record.id, record.plate)}
-                        className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                        title="Forzar Salida"
+                        onClick={() => record.status === 'ACTIVE' ? onReprintTicket(record) : onReprintInvoice(record)}
+                        className={`transition-all p-1.5 rounded-lg border flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tight
+                          ${record.status === 'ACTIVE' 
+                            ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-600 hover:text-white' 
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                        title={record.status === 'ACTIVE' ? "Reimprimir Tiquete QR" : "Reimprimir Factura Final"}
                       >
-                        <LogOut size={18} />
+                        <Printer size={14} />
+                        {record.status === 'ACTIVE' ? 'Tiquete' : 'Factura'}
                       </button>
-                    )}
+                    </div>
                   </div>
+
 
                   {/* Info Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-4">

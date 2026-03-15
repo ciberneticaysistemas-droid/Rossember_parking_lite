@@ -9,9 +9,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     // Base URL para GitHub Pages. Debe coincidir con el nombre de tu repositorio.
-    // Ejemplo: si tu repo es https://github.com/usuario/PochiParking
-    // entonces base debe ser '/PochiParking/'
-    base: '/PochiParking/',
+    // Ejemplo: si tu repo es https://github.com/usuario/ParkingCore
+    // entonces base debe ser '/ParkingCore/'
+    base: '/ParkingCore/',
     define: {
       // Expose the API_KEY safely. Using JSON.stringify ensures it's treated as a string literal.
       'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),

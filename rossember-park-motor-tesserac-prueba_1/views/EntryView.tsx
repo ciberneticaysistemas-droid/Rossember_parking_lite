@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { CameraFeed } from '../components/CameraFeed';
 import { VehicleCard } from '../components/VehicleCard';
-import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
 import { analyzeImage } from '../services/geminiService';
 import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor } from '../types';
@@ -568,12 +567,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
             </div>
 
             {/* Virtual Keyboard */}
-            <VirtualKeyboard
-                isVisible={activeInput !== null}
-                onKeyPress={handleVirtualKeyPress}
-                onBackspace={handleVirtualBackspace}
-                onClose={() => setActiveInput(null)}
-            />
         </div>
     );
 };

@@ -71,4 +71,59 @@ export interface BannedVehicle {
   plate: string;
   reason: string;
   createdAt: number;
-}
+}
+
+export interface HardwareScannerConfig {
+  enabled: boolean;
+  prefix?: string;
+  suffix?: string;
+  captureGlobally: boolean;
+}
+
+export interface DocumentConfig {
+  businessName: string;
+  nit: string;
+  address: string;
+  phone: string;
+  legalInfo: string;
+  ticketFooter: string;
+  invoiceFooter: string;
+  showWatermark: boolean;
+}
+
+export interface KeyboardShortcutsConfig {
+  registerEntry: string;
+  focusPlateInput: string;
+  toggleCar: string;
+  toggleMoto: string;
+  toggleBike: string;
+  toggleAccessibility: string;
+  focusSearch: string;
+  openScanner: string;
+  confirmPayment: string;
+  switchToEntry: string;
+  switchToExit: string;
+  printDocument: string;
+}
+
+export const DEFAULT_SHORTCUTS: KeyboardShortcutsConfig = {
+  registerEntry: 'F2',
+  focusPlateInput: 'F3',
+  toggleCar: 'F4',
+  toggleMoto: 'F5',
+  toggleBike: 'F6',
+  toggleAccessibility: 'F7',
+  focusSearch: 'F8',
+  openScanner: 'F9',
+  confirmPayment: 'F10',
+  switchToEntry: 'F1',
+  switchToExit: 'F12',
+  printDocument: 'F11',
+};
+
+export interface LicenseConfig {
+  expirationDate: number | null; // ms timestamp, si es null no hay limite
+  unlockPassword?: string; // default será "12345"
+  isActive: boolean; // para habilitarlo o deshabilitarlo facilmente
+}
+

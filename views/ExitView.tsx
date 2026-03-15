@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Search, X, CheckCircle, AlertCircle, Clock, MapPin, CreditCard, Banknote, Smartphone, Receipt, Printer, ArrowRight } from 'lucide-react';
-import { ParkingRecord, VehicleType } from '../types';
+import { ParkingRecord, VehicleType, DocumentConfig, HardwareScannerConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS } from '../types';
 import { QRScannerCamera } from '../components/QRScannerCamera';
 import { BoothPaymentModal } from '../components/BoothPaymentModal';
 import { InvoiceTicket } from '../components/InvoiceTicket';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 interface ExitViewProps {
   records: ParkingRecord[];
@@ -16,6 +17,10 @@ interface ExitViewProps {
   ivaEnabled: boolean;
   ivaRate: number;
   printerConfig?: { name: string; connected: boolean; autoprint?: boolean } | null;
+  externalScanData?: string | null;
+  documentConfig?: DocumentConfig;
+  hardwareScannerConfig?: HardwareScannerConfig;
+  keyboardShortcuts?: KeyboardShortcutsConfig;
 }
 
 export const ExitView: React.FC<ExitViewProps> = ({
@@ -28,7 +33,11 @@ export const ExitView: React.FC<ExitViewProps> = ({
   rates,
   ivaEnabled,
   ivaRate,
-  printerConfig
+  printerConfig,
+  externalScanData,
+  documentConfig,
+  hardwareScannerConfig,
+  keyboardShortcuts
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -36,6 +45,20 @@ export const ExitView: React.FC<ExitViewProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Keyboard Shortcuts
+  const shortcuts = keyboardShortcuts || DEFAULT_SHORTCUTS;
+  useKeyboardShortcuts({
+    [shortcuts.focusSearch]: () => searchInputRef.current?.focus(),
+    [shortcuts.openScanner]: () => setScanning(true),
+    [shortcuts.confirmPayment]: () => {
+      if (selectedRecord && !showPaymentModal && !invoiceData) {
+        setShowPaymentModal(true);
+      }
+    }
+  });
 
   // Real-time clock Colombia
   const [currentTime, setCurrentTime] = useState('');
@@ -63,31 +86,50 @@ export const ExitView: React.FC<ExitViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Handle External Scan (from physical hardware scanner)
+  useEffect(() => {
+    if (externalScanData) {
+      handleQRResult(externalScanData);
+    }
+  }, [externalScanData]);
+
   const activeRecords = records.filter(r => r.status === 'ACTIVE');
 
   const handleQRResult = (data: string) => {
     setScanning(false);
     setErrorMsg(null);
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed.v === 'POCHI-PARK-V1' && parsed.id) {
-        const record = activeRecords.find(r => r.id === parsed.id);
-        if (record) {
-          setSelectedRecord(record);
-        } else {
-          // Check if it's already completed for security
-          const completed = records.find(r => r.id === parsed.id && r.status === 'COMPLETED');
-          if (completed) {
-            setErrorMsg("🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida.");
-          } else {
-            setErrorMsg("⚠️ El vehículo no se encuentra activo en el sistema.");
-          }
+    
+    let recordId = '';
+
+    // Intentamos detectar el nuevo formato simplificado PC1|ID o PP1|ID
+    if (data.startsWith('PC1|') || data.startsWith('PP1|')) {
+      recordId = data.split('|')[1];
+    } else {
+      // Fallback para el formato JSON antiguo (compatibilidad con tiquetes ya impresos)
+      try {
+        const parsed = JSON.parse(data);
+        if ((parsed.v === 'POCHI-PARK-V1' || parsed.v === 'PC-PARK-V1') && parsed.id) {
+          recordId = parsed.id;
         }
-      } else {
-        setErrorMsg("⚠️ Código QR no válido para este sistema.");
+      } catch (e) {
+        // No es JSON ni formato nuevo
       }
-    } catch (e) {
-      // If it's not JSON, maybe it's just the plate?
+    }
+
+    if (recordId) {
+      const record = activeRecords.find(r => r.id === recordId);
+      if (record) {
+        setSelectedRecord(record);
+      } else {
+        const completed = records.find(r => r.id === recordId && r.status === 'COMPLETED');
+        if (completed) {
+          setErrorMsg("🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida.");
+        } else {
+          setErrorMsg("⚠️ El vehículo no se encuentra activo en el sistema.");
+        }
+      }
+    } else {
+      // If it's not a recognized QR format, try to treat it as a plate number
       const record = activeRecords.find(r => r.plate.toUpperCase() === data.toUpperCase());
       if (record) {
         setSelectedRecord(record);
@@ -185,6 +227,24 @@ export const ExitView: React.FC<ExitViewProps> = ({
         />
       )}
 
+      {/* Invoice MODAL */}
+      {invoiceData && (
+        <InvoiceTicket
+          record={invoiceData.record}
+          cost={invoiceData.cost}
+          subtotal={invoiceData.subtotal}
+          ivaAmount={invoiceData.ivaAmount}
+          ivaRate={invoiceData.ivaRate}
+          paymentMethod={invoiceData.paymentMethod}
+          cashGiven={invoiceData.cashGiven}
+          change={invoiceData.change}
+          onClose={() => setInvoiceData(null)}
+          printerConfig={printerConfig}
+          documentConfig={documentConfig}
+          keyboardShortcuts={shortcuts}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-gray-800 p-8 shadow-md">
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -207,10 +267,13 @@ export const ExitView: React.FC<ExitViewProps> = ({
           
           <button 
             onClick={() => setScanning(true)}
-            className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-4 rounded-2xl font-black flex items-center gap-3 transition-all shadow-lg active:scale-95 text-lg"
+            className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-4 rounded-2xl font-black flex items-center gap-3 transition-all shadow-lg active:scale-95 text-lg relative"
           >
             <Camera size={24} />
-            ESCANEAR QR
+            {hardwareScannerConfig?.enabled ? 'LEER CÁMARA' : 'ESCANEAR QR'}
+            <span className="absolute -top-1 -right-1 bg-gray-700 border border-gray-600 px-2 py-0.5 rounded text-[10px] text-white/70">
+                {shortcuts.openScanner}
+            </span>
           </button>
         </div>
       </div>
@@ -223,6 +286,7 @@ export const ExitView: React.FC<ExitViewProps> = ({
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300" size={20} />
               <input 
+                ref={searchInputRef}
                 type="text"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value.toUpperCase())}
@@ -230,6 +294,11 @@ export const ExitView: React.FC<ExitViewProps> = ({
                 placeholder="ABC123"
                 className="w-full pl-12 pr-4 py-4 bg-[#FFF] border-2 border-orange-100 rounded-2xl focus:border-orange-500 outline-none font-bold text-xl tracking-widest text-gray-800 transition-all placeholder-orange-200"
               />
+              <div className="absolute top-0 right-0 p-2">
+                 <span className="text-[10px] px-2 py-0.5 rounded bg-orange-100 border border-orange-200 text-orange-600 font-black">
+                     {shortcuts.focusSearch}
+                 </span>
+              </div>
             </div>
             <button 
               onClick={handleSearch}
@@ -296,10 +365,13 @@ export const ExitView: React.FC<ExitViewProps> = ({
               {/* Action */}
               <button 
                 onClick={() => isGracePeriod ? handleProcessPayment(selectedRecord.id, 0, 'GRACIA') : setShowPaymentModal(true)}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-6 rounded-3xl text-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl shadow-orange-500/20 active:scale-95"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-6 rounded-3xl text-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl shadow-orange-500/20 active:scale-95 relative group"
               >
                 {isGracePeriod ? 'PROCESAR SALIDA (GRATIS)' : 'SIGUIENTE: COBRO EN CAJA'}
                 <ArrowRight size={28} />
+                <span className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/20 border border-white/20 px-3 py-1 rounded-xl text-xs group-hover:scale-110 transition-transform">
+                   {shortcuts.confirmPayment}
+                </span>
               </button>
             </div>
           </div>

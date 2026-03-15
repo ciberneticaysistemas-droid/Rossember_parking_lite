@@ -21,7 +21,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ clientLogo }) => {
             )}
             <div>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-800 drop-shadow-sm flex items-center gap-2">
-                PochiParking
+                ParkingCore
               </h1>
               <p className="text-orange-100 text-xs font-medium tracking-wider">SISTEMA INTEGRAL DE GESTIÓN</p>
             </div>
@@ -32,7 +32,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ clientLogo }) => {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-12 flex flex-col justify-center">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-black text-gray-800 tracking-tight mb-4">
-            Bienvenido a <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">PochiParking</span>
+            Bienvenido a <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">ParkingCore</span>
           </h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto">Selecciona el módulo al que deseas acceder para gestionar el parqueadero de forma rápida y eficiente.</p>
         </div>
@@ -64,7 +64,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ clientLogo }) => {
         </div>
       </main>
       <footer className="py-6 text-center text-gray-400 text-sm">
-        <p>&copy; {new Date().getFullYear()} PochiParking. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} ParkingCore. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

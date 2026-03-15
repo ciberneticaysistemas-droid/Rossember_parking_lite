@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { VehicleCard } from '../components/VehicleCard';
-import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { ParkingTicketQR } from '../components/ParkingTicketQR';
 
-import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor } from '../types';
+import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS } from '../types';
 import { useVoice } from '../hooks/useVoice';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar, Clock, Star, MessageSquare, HardHat } from 'lucide-react';
 import { PrinterConfig } from '../components/PrinterSettingsModal';
 
@@ -29,6 +29,8 @@ interface EntryViewProps {
     specialRates: SpecialRate[];
     floors?: Floor[];
     printerConfig?: PrinterConfig | null;
+    documentConfig?: DocumentConfig;
+    keyboardShortcuts?: KeyboardShortcutsConfig;
 }
 
 export const EntryView: React.FC<EntryViewProps> = ({
@@ -41,7 +43,9 @@ export const EntryView: React.FC<EntryViewProps> = ({
     clientLogo,
     specialRates,
     floors,
-    printerConfig
+    printerConfig,
+    documentConfig,
+    keyboardShortcuts
 }) => {
     const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -79,6 +83,19 @@ export const EntryView: React.FC<EntryViewProps> = ({
         return () => clearInterval(timer);
     }, []);
 
+    const plateInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Keyboard Shortcuts
+    const shortcuts = keyboardShortcuts || DEFAULT_SHORTCUTS;
+    useKeyboardShortcuts({
+      [shortcuts.registerEntry]: () => handleManualSubmit(),
+      [shortcuts.focusPlateInput]: () => plateInputRef.current?.focus(),
+      [shortcuts.toggleCar]: () => setManualType(VehicleType.CAR),
+      [shortcuts.toggleMoto]: () => setManualType(VehicleType.MOTORCYCLE),
+      [shortcuts.toggleBike]: () => setManualType(VehicleType.BICYCLE),
+      [shortcuts.toggleAccessibility]: () => setIsAccessibilityMode(prev => !prev),
+    });
+
     // QR Ticket State
     const [showTicket, setShowTicket] = useState(false);
     const [ticketData, setTicketData] = useState<{
@@ -88,9 +105,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
         vehicleType: VehicleType;
         entryTime: number;
     } | null>(null);
-
-    // Virtual Keyboard State
-    const [activeInput, setActiveInput] = useState<'ownerId' | 'manualPlate' | 'vehicleComment' | 'helmetDescription' | null>(null);
 
     // Feedback State
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -134,30 +148,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
             (capacities.EV_CHARGING === -1 ? 0 : capacities.EV_CHARGING) + 
             (capacities.BICYCLE === -1 ? 0 : capacities.BICYCLE);
     }
-
-    const handleVirtualKeyPress = (key: string) => {
-        if (activeInput === 'ownerId') {
-            setOwnerIdInput(prev => prev + key);
-        } else if (activeInput === 'manualPlate') {
-            setManualPlate(prev => (prev + key).toUpperCase());
-        } else if (activeInput === 'vehicleComment') {
-            setVehicleComment(prev => prev + key);
-        } else if (activeInput === 'helmetDescription') {
-            setHelmetDescription(prev => prev + key);
-        }
-    };
-
-    const handleVirtualBackspace = () => {
-        if (activeInput === 'ownerId') {
-            setOwnerIdInput(prev => prev.slice(0, -1));
-        } else if (activeInput === 'manualPlate') {
-            setManualPlate(prev => prev.slice(0, -1));
-        } else if (activeInput === 'vehicleComment') {
-            setVehicleComment(prev => prev.slice(0, -1));
-        } else if (activeInput === 'helmetDescription') {
-            setHelmetDescription(prev => prev.slice(0, -1));
-        }
-    };
 
     const handleManualSubmit = () => {
         setErrorMsg(null);
@@ -248,13 +238,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 });
                 setShowTicket(true);
 
-                // Auto-print if configured
-                if (printerConfig?.autoprint) {
-                    setTimeout(() => {
-                        window.print();
-                    }, 500);
-                }
-
                 // Reset
                 setManualPlate('');
                 setOwnerIdInput('');
@@ -264,7 +247,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 setVehicleComment('');
                 setLeavesHelmet(false);
                 setHelmetDescription('');
-                setActiveInput(null);
             } else {
                 setErrorMsg(processError || "⚠️ No hay plazas disponibles o el vehículo ya está registrado.");
                 speak(processError || "Lo sentimos, no hay plazas disponibles.");
@@ -286,7 +268,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
     };
 
     return (
-        <div className={`min-h-screen bg-[#FFFBF7] ${activeInput ? 'pb-96' : 'pb-8'}`}>
+        <div className="min-h-screen bg-[#FFFBF7] pb-8">
             {/* QR Ticket Modal */}
             {showTicket && ticketData && (
                 <ParkingTicketQR
@@ -297,8 +279,11 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     entryTime={ticketData.entryTime}
                     onClose={() => setShowTicket(false)}
                     printerConfig={printerConfig}
+                    documentConfig={documentConfig}
+                    keyboardShortcuts={shortcuts}
                     spotNumber=""  /* Not used anymore */
                 />
+
             )}
 
             {/* Header */}
@@ -371,7 +356,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                     <input
                                         type="text"
                                         value={ownerIdInput}
-                                        onFocus={() => setActiveInput('ownerId')}
                                         onChange={(e) => setOwnerIdInput(e.target.value)}
                                         placeholder="Ingrese el número de cédula"
                                         className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none text-lg transition-all text-gray-900 placeholder-gray-400 cursor-pointer"
@@ -384,13 +368,16 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                 {/* Accessibility Toggle */}
                                 <button
                                     onClick={() => setIsAccessibilityMode(!isAccessibilityMode)}
-                                    className={`flex items-center justify-center gap-2 px-4 py-4 rounded-xl text-sm font-bold transition-all border-2 ${isAccessibilityMode
+                                    className={`flex items-center justify-center gap-2 px-4 py-4 rounded-xl text-sm font-bold transition-all border-2 relative ${isAccessibilityMode
                                         ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200'
                                         : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                         }`}
                                 >
                                     <Accessibility size={20} />
                                     {isAccessibilityMode ? 'Prioridad ACTIVA' : 'Prioridad'}
+                                    <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded border ${isAccessibilityMode ? 'bg-blue-100 border-blue-200 text-blue-500' : 'bg-gray-100 border-gray-200 text-gray-400'} font-black uppercase`}>
+                                        {shortcuts.toggleAccessibility}
+                                    </span>
                                 </button>
 
                                 {/* EV Charging Toggle */}
@@ -426,7 +413,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                             key={opt.type}
                                             type="button"
                                             onClick={() => setManualType(opt.type)}
-                                            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${manualType === opt.type
+                                            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all relative ${manualType === opt.type
                                                 ? `bg-${opt.color}-600 border-${opt.color}-600 text-white shadow-lg`
                                                 : `bg-white border-gray-300 text-gray-600 hover:border-${opt.color}-300`
                                                 }`}
@@ -438,21 +425,29 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         >
                                             {opt.icon}
                                             <span className="text-sm font-bold mt-1">{opt.label}</span>
+                                            <span className={`absolute -top-1 -right-1 text-[8px] px-1 rounded border ${manualType === opt.type ? 'bg-orange-100 border-orange-200 text-orange-500' : 'bg-gray-100 border-gray-200 text-gray-400'} font-black uppercase whitespace-nowrap`}>
+                                                {opt.type === VehicleType.CAR ? shortcuts.toggleCar : opt.type === VehicleType.MOTORCYCLE ? shortcuts.toggleMoto : shortcuts.toggleBike}
+                                            </span>
                                         </button>
                                     ))}
                                 </div>
 
-                                <div>
+                                <div className="relative">
                                     <label className="block text-sm font-bold text-gray-700 uppercase mb-2 ml-1">Número de Placa / Código</label>
                                     <input
+                                        ref={plateInputRef}
                                         type="text"
                                         value={manualPlate}
-                                        onFocus={() => setActiveInput('manualPlate')}
                                         onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
                                         placeholder={manualType === VehicleType.BICYCLE ? 'BICI-001 o libre' : 'AAA123'}
                                         maxLength={10}
                                         className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
                                     />
+                                    <div className="absolute top-0 right-0 p-2">
+                                         <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 border border-blue-200 text-blue-600 font-black">
+                                             {shortcuts.focusPlateInput}
+                                         </span>
+                                    </div>
                                 </div>
 
 
@@ -501,7 +496,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         <input
                                             type="text"
                                             value={vehicleComment}
-                                            onFocus={() => setActiveInput('vehicleComment')}
                                             onChange={(e) => setVehicleComment(e.target.value)}
                                             placeholder="Ej: Rayón en puerta derecha"
                                             className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-gray-800"
@@ -528,7 +522,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                 <input
                                                     type="text"
                                                     value={helmetDescription}
-                                                    onFocus={() => setActiveInput('helmetDescription')}
                                                     onChange={(e) => setHelmetDescription(e.target.value)}
                                                     placeholder="Descripción del casco (color, marca...)"
                                                     className="w-full px-4 py-3 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition-all text-gray-800"
@@ -541,9 +534,12 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                 <button
                                     onClick={handleManualSubmit}
                                     disabled={isProcessing}
-                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 shadow-orange-500/20"
+                                    className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all shadow-lg active:scale-95 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 shadow-orange-500/20 relative group"
                                 >
                                     {isProcessing ? 'Procesando...' : '✅ Registrar Ingreso'}
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 px-2 py-1 rounded text-xs border border-white/20 group-hover:scale-110 transition-transform">
+                                        {shortcuts.registerEntry}
+                                    </span>
                                 </button>
                             </div>
 
@@ -680,13 +676,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 </div>
             </div>
 
-            {/* Virtual Keyboard */}
-            <VirtualKeyboard
-                isVisible={activeInput !== null}
-                onKeyPress={handleVirtualKeyPress}
-                onBackspace={handleVirtualBackspace}
-                onClose={() => setActiveInput(null)}
-            />
         </div>
     );
 };

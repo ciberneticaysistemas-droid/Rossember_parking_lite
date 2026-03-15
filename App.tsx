@@ -8,7 +8,10 @@ import { AdminLogin } from './views/AdminLogin';
 import { HomeMenu } from './views/HomeMenu';
 import { AccessView } from './views/AccessView';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle } from './types';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './types';
+import { LockScreen } from './components/LockScreen';
+import { DevConfigModal } from './components/DevConfigModal';
+import { ShieldAlert, Key } from 'lucide-react';
 
 // Default Capacity Configuration
 const DEFAULT_CAPACITIES = {
@@ -116,6 +119,40 @@ const AppContent: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [hardwareScannerConfig, setHardwareScannerConfig] = useState<HardwareScannerConfig>(() => {
+    const saved = localStorage.getItem('hardwareScannerConfig') || localStorage.getItem('qrReaderConfig');
+    return saved ? JSON.parse(saved) : { enabled: false, prefix: '', suffix: 'Enter', captureGlobally: true };
+  });
+
+  const [documentConfig, setDocumentConfig] = useState<DocumentConfig>(() => {
+    const saved = localStorage.getItem('documentConfig');
+    return saved ? JSON.parse(saved) : {
+      businessName: 'Rossember Parking',
+      nit: '900.123.456-7',
+      address: 'Calle Ficticia 123, Bogotá',
+      phone: '300 123 4567',
+      legalInfo: 'SISTEMA INTEGRAL DE GESTIÓN DE PARQUEADERO',
+      ticketFooter: 'Conserve este tiquete. Se requiere para registrar la salida.',
+      invoiceFooter: 'Gracias por su visita. Este documento es equivalente a factura.',
+      showWatermark: true
+    };
+  });
+
+  const [keyboardShortcuts, setKeyboardShortcuts] = useState<KeyboardShortcutsConfig>(() => {
+    const saved = localStorage.getItem('keyboardShortcuts');
+    return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
+  });
+
+  const [licenseConfig, setLicenseConfig] = useState<LicenseConfig>(() => {
+    const saved = localStorage.getItem('licenseConfig');
+    return saved ? JSON.parse(saved) : { isActive: false, expirationDate: null, unlockPassword: '12345' };
+  });
+
+  const [isLocked, setIsLocked] = useState(false);
+  const [showDevModal, setShowDevModal] = useState(false);
+  const [showDevPwdPrompt, setShowDevPwdPrompt] = useState(false);
+  const [devPwd, setDevPwd] = useState('');
+
   // Derived Total Capacities
   const totalCapacities = floors.reduce((acc, floor) => {
     const floorCaps = floor.capacities as any;
@@ -165,6 +202,46 @@ const AppContent: React.FC = () => {
       localStorage.removeItem('printerConfig');
     }
   }, [printerConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('hardwareScannerConfig', JSON.stringify(hardwareScannerConfig));
+  }, [hardwareScannerConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('documentConfig', JSON.stringify(documentConfig));
+  }, [documentConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('keyboardShortcuts', JSON.stringify(keyboardShortcuts));
+  }, [keyboardShortcuts]);
+
+  useEffect(() => {
+    localStorage.setItem('licenseConfig', JSON.stringify(licenseConfig));
+    // Check if we should be locked initially or whenever config changes
+    if (licenseConfig.isActive && licenseConfig.expirationDate && Date.now() > licenseConfig.expirationDate) {
+      // Look if someone already unlocked it in this session (temporary)
+      const sessionUnlocked = sessionStorage.getItem('softwareUnlocked') === 'true';
+      if (!sessionUnlocked) {
+        setIsLocked(true);
+      }
+    } else {
+      setIsLocked(false);
+    }
+  }, [licenseConfig]);
+
+  // Periodic check for the "time bomb"
+  useEffect(() => {
+    if (!licenseConfig.isActive || !licenseConfig.expirationDate || isLocked) return;
+
+    const interval = setInterval(() => {
+      if (Date.now() > (licenseConfig.expirationDate || 0)) {
+        setIsLocked(true);
+        clearInterval(interval);
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [licenseConfig, isLocked]);
 
   // Helper Functions
   const getAvailableSpot = (type: VehicleType, isPriority: boolean, requiresCharging: boolean = false): { spot: string, floorId: string } | null => {
@@ -469,8 +546,77 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleDevLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (devPwd === "AlejandroJuanCristopher") {
+      setShowDevPwdPrompt(false);
+      setShowDevModal(true);
+      setDevPwd('');
+    } else {
+      alert("Clave de desarrollador incorrecta");
+      setDevPwd('');
+    }
+  };
+
   return (
-    <Routes>
+    <div className="relative min-h-screen">
+      {/* Time Lock Screen */}
+      {isLocked && (
+        <LockScreen 
+          config={licenseConfig} 
+          onUnlock={() => {
+            setIsLocked(false);
+            // Al desbloquear con la clave del cliente, desactivamos el bloqueo automático
+            // para que no se vuelva a bloquear por la fecha vieja.
+            setLicenseConfig(prev => ({ ...prev, isActive: false }));
+            sessionStorage.setItem('softwareUnlocked', 'true');
+          }} 
+        />
+      )}
+
+      {/* Dev Password Prompt */}
+      {showDevPwdPrompt && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+          <form onSubmit={handleDevLogin} className="bg-slate-900 border border-slate-700 p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center">
+            <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <ShieldAlert className="text-blue-400" size={32} />
+            </div>
+            <h3 className="text-white font-black uppercase tracking-widest mb-4">Acceso Desarrollador</h3>
+            <input 
+              type="password"
+              placeholder="Ingrese Clave Maestra"
+              value={devPwd}
+              onChange={e => setDevPwd(e.target.value)}
+              autoFocus
+              className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-3 text-white text-center mb-4 focus:border-blue-500 outline-none"
+            />
+            <div className="flex gap-2">
+               <button type="button" onClick={() => setShowDevPwdPrompt(false)} className="flex-1 py-3 text-slate-400 font-bold">Cancelar</button>
+               <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">Entrar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Dev Config Modal */}
+      {showDevModal && (
+        <DevConfigModal 
+          currentConfig={licenseConfig}
+          onSave={setLicenseConfig}
+          onClose={() => setShowDevModal(false)}
+        />
+      )}
+
+      {/* Floating Dev Button (Near corner, subtle) */}
+      <button 
+        onClick={() => setShowDevPwdPrompt(true)}
+        className="fixed bottom-4 right-4 w-8 h-8 bg-slate-800/20 hover:bg-slate-800/80 text-slate-500/50 hover:text-white rounded-lg flex items-center justify-center transition-all z-[90] backdrop-blur-sm border border-white/5"
+        title="Configuración Desarrollador"
+      >
+        <ShieldAlert size={14} />
+      </button>
+
+      <Routes>
       {/* Menu Principal */}
       <Route path="/" element={<HomeMenu clientLogo={clientLogo} />} />
 
@@ -491,8 +637,11 @@ const AppContent: React.FC = () => {
           onPayAtBooth={handlePayAtBooth}
           rates={rates}
           printerConfig={printerConfig}
+          hardwareScannerConfig={hardwareScannerConfig}
           ivaEnabled={rates['IVA_ENABLED'] === 1}
           ivaRate={rates['IVA_RATE'] || 19}
+          documentConfig={documentConfig}
+          keyboardShortcuts={keyboardShortcuts}
         />
       } />
 
@@ -525,7 +674,14 @@ const AppContent: React.FC = () => {
             bannedVehicles={bannedVehicles}
             onBannedVehiclesUpdate={setBannedVehicles}
             onPurgeRecords={handlePurgeRecords}
+            hardwareScannerConfig={hardwareScannerConfig}
+            onHardwareScannerConfigUpdate={setHardwareScannerConfig}
+            documentConfig={documentConfig}
+            onDocumentConfigUpdate={setDocumentConfig}
+            keyboardShortcuts={keyboardShortcuts}
+            onKeyboardShortcutsUpdate={setKeyboardShortcuts}
           />
+
         </ProtectedRoute>
       } />
 
@@ -542,6 +698,7 @@ const AppContent: React.FC = () => {
       {/* Catch all - redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </div>
   );
 };
 

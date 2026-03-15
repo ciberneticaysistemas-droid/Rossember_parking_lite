@@ -28,7 +28,7 @@ const drawHeader = (doc: jsPDF, pageWidth: number) => {
   doc.setTextColor("#ffffff");
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
-  doc.text("Rossember Parking", 20, 20);
+  doc.text("ParkingCore", 20, 20);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -160,7 +160,7 @@ export const generateInvoice = (data: InvoiceData) => {
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.setTextColor(100, 100, 100);
-  doc.text("Gracias por confiar en Rossember Parking. Este documento es un soporte de pago electrónico.", pageWidth / 2, footerY, { align: "center" });
+  doc.text("Gracias por confiar en ParkingCore. Este documento es un soporte de pago electrónico.", pageWidth / 2, footerY, { align: "center" });
   doc.text("Régimen simplificado. No somos grandes contribuyentes.", pageWidth / 2, footerY + 5, { align: "center" });
 
   // Save
@@ -307,7 +307,7 @@ export const generateDailyReport = (records: ParkingRecord[]) => {
   const footerY = doc.internal.pageSize.height - 15;
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text("Informe generado automáticamente por el sistema Rossember Parking.", pageWidth / 2, footerY, { align: "center" });
+  doc.text("Informe generado automáticamente por el sistema ParkingCore.", pageWidth / 2, footerY, { align: "center" });
 
   doc.save(`Reporte_Diario_${today.toISOString().split('T')[0]}.pdf`);
 };

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { CameraFeed } from '../components/CameraFeed';
-import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
 import { Toast } from '../components/Toast';
 import { analyzeImage } from '../services/geminiService';
@@ -377,12 +376,6 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
             </div>
 
             {/* Virtual Keyboard */}
-            <VirtualKeyboard
-                isVisible={activeInput !== null}
-                onKeyPress={handleVirtualKeyPress}
-                onBackspace={handleVirtualBackspace}
-                onClose={() => setActiveInput(null)}
-            />
         </div>
     );
 };
