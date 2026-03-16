@@ -85,7 +85,7 @@ export const AccessView: React.FC<AccessViewProps> = (props) => {
 
       const currentTime = Date.now();
       
-      if (currentTime - lastKeyTime > 50) {
+      if (currentTime - lastKeyTime > 200) {
         buffer = '';
       }
       lastKeyTime = currentTime;

@@ -1,7 +1,0 @@
-{
-  "name": "ParkingCore",
-  "description": "Sistema de automatización de parqueadero inteligente para Fundación Universidad de América, usando Gemini 2.5 Flash.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

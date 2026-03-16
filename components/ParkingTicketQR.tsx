@@ -14,6 +14,7 @@ interface ParkingTicketQRProps {
   printerConfig?: { name: string; connected: boolean; autoprint?: boolean; paperFormat?: string; paperWidth?: number } | null;
   documentConfig?: DocumentConfig;
   keyboardShortcuts?: KeyboardShortcutsConfig;
+  helmetLocation?: string;
 }
 
 const QR_VERSION = 'PC-PARK-V1';
@@ -28,7 +29,8 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
   onClose,
   printerConfig,
   documentConfig,
-  keyboardShortcuts
+  keyboardShortcuts,
+  helmetLocation
 }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +105,7 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             ${ownerId ? `<div class="info-row"><span class="info-label">Cédula</span><span class="info-value">${ownerId}</span></div>` : ''}
             <div class="info-row"><span class="info-label">Entrada</span><span class="info-value">${new Date(entryTime).toLocaleTimeString('es-CO')}</span></div>
             <div class="info-row"><span class="info-label">Fecha</span><span class="info-value">${new Date(entryTime).toLocaleDateString('es-CO')}</span></div>
+            ${helmetLocation ? `<div class="info-row" style="background: #fff7ed; padding: 10px; border: 1px solid #fdba74; border-radius: 8px; margin-top: 10px;"><span class="info-label" style="color: #c2410c;">UBICACIÓN CASCO</span><span class="info-value" style="color: #9a3412; font-size: 18px;">${helmetLocation}</span></div>` : ''}
             
             <div class="qr-wrap">
               ${svgHTML}
@@ -150,10 +153,13 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             e.preventDefault();
             handlePrint();
         }
+        if (e.key === 'Escape') {
+            onClose();
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [keyboardShortcuts]);
+  }, [keyboardShortcuts, onClose]);
 
   // Auto-print effect
   useEffect(() => {
@@ -166,16 +172,19 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-up">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-sm overflow-hidden animate-fade-in-up">
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-white">
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 flex justify-between items-center text-white">
+          <div className="flex items-center gap-2">
             <CheckCircle size={20} />
             <span className="font-bold">Tiquete Generado</span>
           </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm border border-white/10 uppercase tracking-widest hidden sm:block">ESC para salir</span>
+            <button onClick={onClose} className="text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Ticket Body */}
@@ -208,6 +217,12 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
               <span className="text-gray-500 font-medium ml-6">Fecha</span>
               <span className="font-black text-gray-800">{new Date(entryTime).toLocaleDateString('es-CO')}</span>
             </div>
+            {helmetLocation && (
+              <div className="flex justify-between py-2 border-2 border-orange-200 bg-orange-50 rounded-xl px-3 mt-2">
+                <span className="flex items-center gap-2 text-orange-600 font-black text-xs uppercase tracking-wider">UBICACIÓN CASCO</span>
+                <span className="font-black text-orange-900 text-lg">{helmetLocation}</span>
+              </div>
+            )}
           </div>
 
           {/* QR Code */}

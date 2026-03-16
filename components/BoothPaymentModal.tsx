@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, DollarSign, CreditCard, Smartphone, Banknote, CheckCircle, Calculator, Receipt } from 'lucide-react';
+import { X, DollarSign, CreditCard, Smartphone, Banknote, CheckCircle, Calculator, Receipt, HardHat, MapPin, Keyboard } from 'lucide-react';
 import { ParkingRecord, VehicleType } from '../types';
 
 interface BoothPaymentModalProps {
@@ -58,6 +58,43 @@ export const BoothPaymentModal: React.FC<BoothPaymentModalProps> = ({
 
   const quickAmounts = [5000, 10000, 20000, 50000, 100000].filter(a => a >= cost).slice(0, 4);
 
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in the input (except for certain keys)
+      const isInput = (e.target as HTMLElement).tagName === 'INPUT';
+
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'Enter') {
+        if (method !== 'EFECTIVO' || hasEnoughCash) {
+          handleConfirm();
+        }
+      } else if (!isInput) {
+        if (e.key === '1') setMethod('EFECTIVO');
+        if (e.key === '2') setMethod('TARJETA');
+        if (e.key === '3') setMethod('NEQUI');
+      }
+
+      // Quick amounts (F1-F4)
+      if (method === 'EFECTIVO') {
+        if (e.key === 'F1' && quickAmounts[0]) { e.preventDefault(); setCashGiven(String(quickAmounts[0])); }
+        if (e.key === 'F2' && quickAmounts[1]) { e.preventDefault(); setCashGiven(String(quickAmounts[1])); }
+        if (e.key === 'F3' && quickAmounts[2]) { e.preventDefault(); setCashGiven(String(quickAmounts[2])); }
+        if (e.key === 'F4' && quickAmounts[3]) { e.preventDefault(); setCashGiven(String(quickAmounts[3])); }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [method, hasEnoughCash, quickAmounts, onClose, handleConfirm]);
+
+  const ShortcutBadge = ({ keyName }: { keyName: string }) => (
+    <span className="ml-auto bg-gray-100 text-[10px] font-black px-1.5 py-0.5 rounded border border-gray-300 shadow-sm text-gray-500 uppercase">
+      {keyName}
+    </span>
+  );
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[300] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
@@ -66,14 +103,33 @@ export const BoothPaymentModal: React.FC<BoothPaymentModalProps> = ({
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-5 text-white">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold uppercase opacity-80 tracking-widest mb-1">Cobro en Taquilla</p>
+              <p className="text-xs font-bold uppercase opacity-80 tracking-widest mb-1 flex items-center gap-2">
+                <Keyboard size={14} /> Cobro en Taquilla
+              </p>
               <h2 className="text-3xl font-black tracking-wider font-mono">{record.plate}</h2>
               <p className="text-emerald-100 text-sm mt-1">{record.vehicleType} · {duration}</p>
             </div>
-            <button onClick={onClose} className="text-white/70 hover:text-white p-1 hover:bg-white/10 rounded-xl transition-colors">
-              <X size={22} />
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button onClick={onClose} className="text-white/70 hover:text-white p-1 hover:bg-white/10 rounded-xl transition-colors">
+                <X size={22} />
+              </button>
+              <span className="text-[10px] font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm border border-white/10">ESC para salir</span>
+            </div>
           </div>
+          {record.leavesHelmet && (
+            <div className="mt-4 bg-orange-500 rounded-2xl p-4 border-2 border-white/50 shadow-lg animate-pulse">
+                <div className="flex items-center gap-2 text-white mb-2">
+                    <HardHat size={20} className="fill-white" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">⚠️ Entregar Casco del Cliente</span>
+                </div>
+                <div className="bg-white/95 rounded-xl p-3 text-center border shadow-sm">
+                    <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest leading-none mb-1">Ubicación asignada</p>
+                    <h5 className="text-2xl font-black text-orange-600 italic tracking-tighter uppercase leading-none overflow-hidden text-ellipsis">
+                        {record.helmetLocation || 'SIN ASIGNAR'}
+                    </h5>
+                </div>
+            </div>
+          )}
         </div>
 
         <div className="p-5 space-y-5">
@@ -103,19 +159,22 @@ export const BoothPaymentModal: React.FC<BoothPaymentModalProps> = ({
             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Método de Pago</p>
             <div className="grid grid-cols-3 gap-3">
               {([
-                { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote, color: 'emerald' },
-                { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard, color: 'blue' },
-                { id: 'NEQUI', label: 'Nequi', icon: Smartphone, color: 'purple' },
-              ] as { id: PayMethod; label: string; icon: React.ElementType; color: string }[]).map(({ id, label, icon: Icon, color }) => (
+                { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote, color: 'emerald', key: '1' },
+                { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard, color: 'blue', key: '2' },
+                { id: 'NEQUI', label: 'Nequi', icon: Smartphone, color: 'purple', key: '3' },
+              ] as { id: PayMethod; label: string; icon: React.ElementType; color: string; key: string }[]).map(({ id, label, icon: Icon, color, key }) => (
                 <button
                   key={id}
                   onClick={() => setMethod(id)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all font-bold text-sm ${method === id
+                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all font-bold text-xs ${method === id
                     ? `border-${color}-500 bg-${color}-50 text-${color}-700`
                     : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                     }`}
                 >
-                  <Icon size={24} className={method === id ? `text-${color}-600` : 'text-gray-400'} />
+                  <div className="flex justify-between w-full items-start">
+                    <Icon size={20} className={method === id ? `text-${color}-600` : 'text-gray-400'} />
+                    <span className={`text-[9px] px-1 rounded border ${method === id ? `bg-${color}-100 border-${color}-300` : 'bg-gray-50 border-gray-300'}`}>{key}</span>
+                  </div>
                   {label}
                 </button>
               ))}
@@ -145,12 +204,13 @@ export const BoothPaymentModal: React.FC<BoothPaymentModalProps> = ({
               {/* Quick Amounts */}
               {quickAmounts.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
-                  {quickAmounts.map(amt => (
+                  {quickAmounts.map((amt, idx) => (
                     <button
                       key={amt}
                       onClick={() => setCashGiven(String(amt))}
-                      className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors"
+                      className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2"
                     >
+                      <span className="text-[9px] opacity-60">F{idx+1}</span>
                       ${amt.toLocaleString('es-CO')}
                     </button>
                   ))}
@@ -183,14 +243,17 @@ export const BoothPaymentModal: React.FC<BoothPaymentModalProps> = ({
           )}
 
           {/* Confirm Button */}
-          <button
-            onClick={handleConfirm}
-            disabled={method === 'EFECTIVO' && !hasEnoughCash}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-emerald-200 text-lg active:scale-[0.98]"
-          >
-            <CheckCircle size={22} />
-            Confirmar Pago · {formatCOP(cost)}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleConfirm}
+              disabled={method === 'EFECTIVO' && !hasEnoughCash}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-emerald-200 text-lg active:scale-[0.98]"
+            >
+              <CheckCircle size={22} />
+              <span>Confirmar Pago · {formatCOP(cost)}</span>
+            </button>
+            <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest">Presiona ENTER para confirmar</p>
+          </div>
         </div>
       </div>
     </div>

@@ -46,6 +46,7 @@ export interface ParkingRecord {
   vehicleComment?: string;
   leavesHelmet?: boolean;
   helmetDescription?: string;
+  helmetLocation?: string;
 }
 
 

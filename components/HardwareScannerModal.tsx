@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HardwareScannerConfig } from '../types';
-import { Tablet, X, Save, ShieldCheck, Keyboard } from 'lucide-react';
+import { Tablet, X, Save, ShieldCheck, Keyboard, Zap, Ghost } from 'lucide-react';
 
 interface HardwareScannerModalProps {
     currentConfig: HardwareScannerConfig | null;
@@ -19,6 +19,9 @@ export const HardwareScannerModal: React.FC<HardwareScannerModalProps> = ({
         suffix: 'Enter',
         captureGlobally: true
     });
+
+    const [testBuffer, setTestBuffer] = useState('');
+    const [lastScan, setLastScan] = useState<string | null>(null);
 
     const handleSave = () => {
         onSave(config);

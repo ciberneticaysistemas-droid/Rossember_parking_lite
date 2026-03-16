@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DatabaseView } from '../components/DatabaseView';
 import { RateSettingsModal } from '../components/RateSettingsModal';
 import { SpecialRatesModal } from '../components/SpecialRatesModal';
@@ -70,6 +71,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     keyboardShortcuts,
     onKeyboardShortcutsUpdate
 }) => {
+    const navigate = useNavigate();
     const [showDatabase, setShowDatabase] = useState(false);
     const [showRateSettings, setShowRateSettings] = useState(false);
     const [showPlateSearch, setShowPlateSearch] = useState(false);
@@ -215,6 +217,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 <p className="text-xs text-orange-900/60 leading-tight capitalize">{currentDate}</p>
                             </div>
                         </div>
+
+                        {/* Quick Access to POS */}
+                        <button
+                            onClick={() => navigate('/acceso')}
+                            className="flex items-center gap-3 bg-white text-orange-600 px-6 py-3 rounded-2xl font-black shadow-lg shadow-orange-900/10 hover:shadow-orange-900/20 active:scale-95 transition-all border border-orange-200 group"
+                        >
+                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                            <span className="uppercase tracking-widest text-xs">Ir a Control de Acceso</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1072,7 +1083,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                 </div>
                                             </div>
                                             <button 
-                                                onClick={() => onBannedVehiclesUpdate(bannedVehicles.filter(bv => bv.plate !== v.plate))}
+                                                onClick={() => {
+                                                    if (window.confirm(`¿Está seguro de que desea eliminar la placa ${v.plate} de la lista de vetados?`)) {
+                                                        onBannedVehiclesUpdate(bannedVehicles.filter(bv => bv.plate !== v.plate));
+                                                    }
+                                                }}
                                                 className="text-gray-300 hover:text-red-500 p-2 hover:bg-red-100 rounded-lg transition-all"
                                                 title="Eliminar de lista negra"
                                             >

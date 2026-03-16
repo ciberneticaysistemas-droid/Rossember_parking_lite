@@ -12,6 +12,7 @@ interface InvoiceTicketProps {
     exitTime: number;
     vehicleState?: string;
     leavesHelmet?: boolean;
+    helmetLocation?: string;
   };
   cost: number;
   subtotal: number;
@@ -127,8 +128,9 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
               <div class="detail-row"><span class="label">Fecha:</span><span class="value">${new Date(record.exitTime).toLocaleDateString('es-CO')}</span></div>
               <div class="detail-row"><span class="label">Entrada:</span><span class="value">${new Date(record.entryTime).toLocaleTimeString('es-CO')}</span></div>
               <div class="detail-row"><span class="label">Salida:</span><span class="value">${new Date(record.exitTime).toLocaleTimeString('es-CO')}</span></div>
-              <div class="detail-row"><span class="label">Tipo:</span><span class="value">${record.vehicleType}</span></div>
+              <div className="detail-row"><span class="label">Tipo:</span><span class="value">${record.vehicleType}</span></div>
               ${record.ownerId ? `<div class="detail-row"><span class="label">Cédula:</span><span class="value">${record.ownerId}</span></div>` : ''}
+              ${record.leavesHelmet ? `<div class="detail-row" style="margin-top: 5px; color: #c2410c;"><span class="label">Casco:</span><span class="value">ENTREGADO (${record.helmetLocation || 'S/E'})</span></div>` : ''}
               <div class="detail-row"><span class="label">Método:</span><span class="value">${paymentMethod}</span></div>
             </div>
 
@@ -189,10 +191,13 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
             e.preventDefault();
             handlePrint();
         }
+        if (e.key === 'Escape') {
+            onClose();
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [keyboardShortcuts]);
+  }, [keyboardShortcuts, onClose]);
 
   // Auto-print effect
   useEffect(() => {
@@ -205,7 +210,13 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[400] flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2.5rem] shadow-premium max-w-sm w-full overflow-hidden animate-fade-in-up border border-orange-100">
+      <div className="bg-white rounded-[2.5rem] shadow-premium max-w-sm w-full overflow-hidden animate-fade-in-up border border-orange-100 p-1 relative">
+        <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
+          <button onClick={onClose} className="bg-emerald-700/30 hover:bg-emerald-700/50 p-2 rounded-full backdrop-blur-md transition-all text-white">
+            <X size={18} />
+          </button>
+          <span className="text-[9px] font-black bg-emerald-700/30 px-2 py-0.5 rounded border border-white/10 uppercase tracking-widest text-emerald-50">ESC salir</span>
+        </div>
         
         {/* Success Header */}
         <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-8 text-white text-center">
@@ -232,6 +243,13 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
               <span className="text-gray-400 uppercase tracking-widest font-bold">Método</span>
               <span className="font-bold text-gray-700">{paymentMethod}</span>
             </div>
+
+            {record.leavesHelmet && (
+              <div className="flex justify-between items-center text-[10px] bg-orange-100/50 p-2 rounded-lg border border-orange-200">
+                <span className="text-orange-600 font-black uppercase tracking-widest">Casco Entregado</span>
+                <span className="font-black text-orange-900 border-l border-orange-200 pl-2">{record.helmetLocation || 'S/E'}</span>
+              </div>
+            )}
 
             {cashGiven && (
               <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-200">

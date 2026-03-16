@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { PaymentModal } from '../components/PaymentModal';
 import { Toast } from '../components/Toast';
 import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType } from '../types';
-import { useVoice } from '../hooks/useVoice';
+
 import { generateInvoice } from '../services/pdfService';
 import { Search, MapPin, Car, Bike, Clock, DollarSign, ArrowLeft, AlertCircle, CreditCard, CheckCircle, Download, Info } from 'lucide-react';
 
@@ -19,7 +19,7 @@ interface SearchViewProps {
 }
 
 export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rates, onProcessPayment, calculateCost, onBackToSelector, floors, clientLogo }) => {
-    const { speak } = useVoice();
+
     const [searchPlate, setSearchPlate] = useState('');
     const [searchResult, setSearchResult] = useState<ParkingRecord | null>(null);
 
@@ -61,7 +61,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
 
     const handleInitiatePayment = () => {
         if (!searchResult) return;
-        speak("Zona de pagos");
+
 
         const { cost, originalCost, minutes, specialRateLabel, specialRate } = calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging, searchResult.plate);
         const hours = Math.floor(minutes / 60);
@@ -112,7 +112,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
 
         setPendingPayment(null);
         setPaymentSuccess(true);
-        speak("Pago exitoso. Su recibo se está descargando.");
+
     };
 
     const handleDownloadReceipt = () => {

@@ -143,7 +143,7 @@ const AppContent: React.FC = () => {
     return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
   });
 
-  const [licenseConfig, setLicenseConfig] = useState<LicenseConfig>(() => {
+  const [licenseConfig, setLicenseConfig] = useState<LicenseConfig | null>(() => {
     const saved = localStorage.getItem('licenseConfig');
     return saved ? JSON.parse(saved) : { isActive: false, expirationDate: null, unlockPassword: '12345' };
   });
@@ -216,6 +216,11 @@ const AppContent: React.FC = () => {
   }, [keyboardShortcuts]);
 
   useEffect(() => {
+    if (!licenseConfig) {
+      localStorage.removeItem('licenseConfig');
+      setIsLocked(false);
+      return;
+    }
     localStorage.setItem('licenseConfig', JSON.stringify(licenseConfig));
     // Check if we should be locked initially or whenever config changes
     if (licenseConfig.isActive && licenseConfig.expirationDate && Date.now() > licenseConfig.expirationDate) {
@@ -231,7 +236,7 @@ const AppContent: React.FC = () => {
 
   // Periodic check for the "time bomb"
   useEffect(() => {
-    if (!licenseConfig.isActive || !licenseConfig.expirationDate || isLocked) return;
+    if (!licenseConfig || !licenseConfig.isActive || !licenseConfig.expirationDate || isLocked) return;
 
     const interval = setInterval(() => {
       if (Date.now() > (licenseConfig.expirationDate || 0)) {
@@ -311,7 +316,7 @@ const AppContent: React.FC = () => {
     const remainingMinutes = minutes % minutesInDay;
 
     let calculatedCost = fullDays * fullRateCap;
-    
+
     if (remainingMinutes > 0 || fullDays === 0) {
       // Valor proporcional del tiempo restante, mínimo el valor de 1 minuto si no hay días completos
       const proportionCost = Math.max(remainingMinutes * minuteRate, fullDays === 0 ? minuteRate : 0);
@@ -379,7 +384,8 @@ const AppContent: React.FC = () => {
     vehicleState?: 'BUENO' | 'REGULAR' | 'MALO',
     vehicleComment?: string,
     leavesHelmet?: boolean,
-    helmetDescription?: string
+    helmetDescription?: string,
+    helmetLocation?: string
   ): { record: ParkingRecord | null, error?: string } => {
     const existing = records.find(r => r.plate === plate && r.status === 'ACTIVE');
     if (existing) {
@@ -412,6 +418,7 @@ const AppContent: React.FC = () => {
       vehicleComment: vehicleComment,
       leavesHelmet: leavesHelmet,
       helmetDescription: helmetDescription,
+      helmetLocation: helmetLocation,
     };
 
     setRecords(prev => [newRecord, ...prev]);
@@ -561,16 +568,16 @@ const AppContent: React.FC = () => {
   return (
     <div className="relative min-h-screen">
       {/* Time Lock Screen */}
-      {isLocked && (
-        <LockScreen 
-          config={licenseConfig} 
+      {isLocked && licenseConfig && (
+        <LockScreen
+          config={licenseConfig}
           onUnlock={() => {
             setIsLocked(false);
             // Al desbloquear con la clave del cliente, desactivamos el bloqueo automático
             // para que no se vuelva a bloquear por la fecha vieja.
-            setLicenseConfig(prev => ({ ...prev, isActive: false }));
+            setLicenseConfig(prev => prev ? ({ ...prev, isActive: false }) : null);
             sessionStorage.setItem('softwareUnlocked', 'true');
-          }} 
+          }}
         />
       )}
 
@@ -582,7 +589,7 @@ const AppContent: React.FC = () => {
               <ShieldAlert className="text-blue-400" size={32} />
             </div>
             <h3 className="text-white font-black uppercase tracking-widest mb-4">Acceso Desarrollador</h3>
-            <input 
+            <input
               type="password"
               placeholder="Ingrese Clave Maestra"
               value={devPwd}
@@ -591,8 +598,8 @@ const AppContent: React.FC = () => {
               className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-3 text-white text-center mb-4 focus:border-blue-500 outline-none"
             />
             <div className="flex gap-2">
-               <button type="button" onClick={() => setShowDevPwdPrompt(false)} className="flex-1 py-3 text-slate-400 font-bold">Cancelar</button>
-               <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">Entrar</button>
+              <button type="button" onClick={() => setShowDevPwdPrompt(false)} className="flex-1 py-3 text-slate-400 font-bold">Cancelar</button>
+              <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">Entrar</button>
             </div>
           </form>
         </div>
@@ -600,7 +607,7 @@ const AppContent: React.FC = () => {
 
       {/* Dev Config Modal */}
       {showDevModal && (
-        <DevConfigModal 
+        <DevConfigModal
           currentConfig={licenseConfig}
           onSave={setLicenseConfig}
           onClose={() => setShowDevModal(false)}
@@ -608,7 +615,7 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Floating Dev Button (Near corner, subtle) */}
-      <button 
+      <button
         onClick={() => setShowDevPwdPrompt(true)}
         className="fixed bottom-4 right-4 w-8 h-8 bg-slate-800/20 hover:bg-slate-800/80 text-slate-500/50 hover:text-white rounded-lg flex items-center justify-center transition-all z-[90] backdrop-blur-sm border border-white/5"
         title="Configuración Desarrollador"
@@ -617,87 +624,87 @@ const AppContent: React.FC = () => {
       </button>
 
       <Routes>
-      {/* Menu Principal */}
-      <Route path="/" element={<HomeMenu clientLogo={clientLogo} />} />
+        {/* Menu Principal */}
+        <Route path="/" element={<HomeMenu clientLogo={clientLogo} />} />
 
-      <Route path="/acceso" element={
-        <AccessView
-          records={records}
-          capacities={totalCapacities}
-          onProcessEntry={handleProcessEntry}
-          onBackToSelector={() => navigate('/')}
-          onCancelEntry={handleCancelEntry}
-          clientLogo={clientLogo}
-          specialRates={specialRates}
-          floors={floors}
-          onProcessExit={handleProcessExit}
-          calculateCost={calculateCost}
-          gracePeriod={rates['GRACE_PERIOD_MINUTES'] || 15}
-          onRevertPayment={handleRevertPayment}
-          onPayAtBooth={handlePayAtBooth}
-          rates={rates}
-          printerConfig={printerConfig}
-          hardwareScannerConfig={hardwareScannerConfig}
-          ivaEnabled={rates['IVA_ENABLED'] === 1}
-          ivaRate={rates['IVA_RATE'] || 19}
-          documentConfig={documentConfig}
-          keyboardShortcuts={keyboardShortcuts}
-        />
-      } />
-
-      <Route path="/admin" element={
-        isAdminAuthenticated ? (
-          <Navigate to="/admin/dashboard" replace />
-        ) : (
-          <AdminLogin onLogin={handleAdminLogin} />
-        )
-      } />
-
-      {/* Protected Admin Dashboard Route */}
-      <Route path="/admin/dashboard" element={
-        <ProtectedRoute isAuthenticated={isAdminAuthenticated}>
-          <AdminView
+        <Route path="/acceso" element={
+          <AccessView
             records={records}
-            rates={rates}
             capacities={totalCapacities}
-            floors={floors}
-            onRateUpdate={handleRateUpdate}
-            onCapacityUpdate={handleCapacityUpdate}
-            onManualExit={handleManualExit}
-            onBackToSelector={handleAdminLogout}
+            onProcessEntry={handleProcessEntry}
+            onBackToSelector={() => navigate('/')}
+            onCancelEntry={handleCancelEntry}
             clientLogo={clientLogo}
-            onUpdateClientLogo={handleClientLogoUpdate}
             specialRates={specialRates}
-            onSpecialRatesUpdate={handleSpecialRatesUpdate}
+            floors={floors}
+            onProcessExit={handleProcessExit}
+            calculateCost={calculateCost}
+            gracePeriod={rates['GRACE_PERIOD_MINUTES'] || 15}
+            onRevertPayment={handleRevertPayment}
+            onPayAtBooth={handlePayAtBooth}
+            rates={rates}
             printerConfig={printerConfig}
-            onPrinterConfigUpdate={setPrinterConfig}
-            bannedVehicles={bannedVehicles}
-            onBannedVehiclesUpdate={setBannedVehicles}
-            onPurgeRecords={handlePurgeRecords}
             hardwareScannerConfig={hardwareScannerConfig}
-            onHardwareScannerConfigUpdate={setHardwareScannerConfig}
+            ivaEnabled={rates['IVA_ENABLED'] === 1}
+            ivaRate={rates['IVA_RATE'] || 19}
             documentConfig={documentConfig}
-            onDocumentConfigUpdate={setDocumentConfig}
             keyboardShortcuts={keyboardShortcuts}
-            onKeyboardShortcutsUpdate={setKeyboardShortcuts}
           />
+        } />
 
-        </ProtectedRoute>
-      } />
+        <Route path="/admin" element={
+          isAdminAuthenticated ? (
+            <Navigate to="/admin/dashboard" replace />
+          ) : (
+            <AdminLogin onLogin={handleAdminLogin} />
+          )
+        } />
 
-      {/* Hidden Device Selector Route (for internal use) */}
-      <Route path="/selector" element={
-        <DeviceSelector
-          onSelectDevice={(device) => {
-            if (device === 'ENTRY') navigate('/entrada');
-            else if (device === 'EXIT') navigate('/salida');
-          }}
-        />
-      } />
+        {/* Protected Admin Dashboard Route */}
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute isAuthenticated={isAdminAuthenticated}>
+            <AdminView
+              records={records}
+              rates={rates}
+              capacities={totalCapacities}
+              floors={floors}
+              onRateUpdate={handleRateUpdate}
+              onCapacityUpdate={handleCapacityUpdate}
+              onManualExit={handleManualExit}
+              onBackToSelector={handleAdminLogout}
+              clientLogo={clientLogo}
+              onUpdateClientLogo={handleClientLogoUpdate}
+              specialRates={specialRates}
+              onSpecialRatesUpdate={handleSpecialRatesUpdate}
+              printerConfig={printerConfig}
+              onPrinterConfigUpdate={setPrinterConfig}
+              bannedVehicles={bannedVehicles}
+              onBannedVehiclesUpdate={setBannedVehicles}
+              onPurgeRecords={handlePurgeRecords}
+              hardwareScannerConfig={hardwareScannerConfig}
+              onHardwareScannerConfigUpdate={setHardwareScannerConfig}
+              documentConfig={documentConfig}
+              onDocumentConfigUpdate={setDocumentConfig}
+              keyboardShortcuts={keyboardShortcuts}
+              onKeyboardShortcutsUpdate={setKeyboardShortcuts}
+            />
 
-      {/* Catch all - redirect to home */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          </ProtectedRoute>
+        } />
+
+        {/* Hidden Device Selector Route (for internal use) */}
+        <Route path="/selector" element={
+          <DeviceSelector
+            onSelectDevice={(device) => {
+              if (device === 'ENTRY') navigate('/entrada');
+              else if (device === 'EXIT') navigate('/salida');
+            }}
+          />
+        } />
+
+        {/* Catch all - redirect to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 };

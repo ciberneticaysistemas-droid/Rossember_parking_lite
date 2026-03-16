@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Search, X, CheckCircle, AlertCircle, Clock, MapPin, CreditCard, Banknote, Smartphone, Receipt, Printer, ArrowRight } from 'lucide-react';
+import { Camera, Search, X, CheckCircle, AlertCircle, Clock, MapPin, CreditCard, Banknote, Smartphone, Receipt, Printer, ArrowRight, HardHat } from 'lucide-react';
 import { ParkingRecord, VehicleType, DocumentConfig, HardwareScannerConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS } from '../types';
 import { QRScannerCamera } from '../components/QRScannerCamera';
 import { BoothPaymentModal } from '../components/BoothPaymentModal';
@@ -86,6 +86,13 @@ export const ExitView: React.FC<ExitViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-focus on mount
+  useEffect(() => {
+    setTimeout(() => {
+        searchInputRef.current?.focus();
+    }, 300);
+  }, []);
+
   // Handle External Scan (from physical hardware scanner)
   useEffect(() => {
     if (externalScanData) {
@@ -95,24 +102,56 @@ export const ExitView: React.FC<ExitViewProps> = ({
 
   const activeRecords = records.filter(r => r.status === 'ACTIVE');
 
-  const handleQRResult = (data: string) => {
+  const handleQRResult = (rawData: string) => {
     setScanning(false);
     setErrorMsg(null);
     
+    let data = rawData.trim();
+    console.log('[Scanner] Raw Data:', data);
+
+    // Heuristic: Fix common HID scanner "translation" errors (Spanish keyboard vs US Scanner)
+    // Common mappings: Ñ -> :, [ -> {, ] -> }, ' -> - or " Depending on context
+    if (data.includes('Ñ') || data.includes('[') || data.includes(']') || data.includes("'")) {
+       let fixed = data
+         .replace(/Ñ/g, ':')
+         .replace(/\[/g, '{')
+         .replace(/\]/g, '|') // In simplified format PC1|ID, | often becomes ] 
+         .replace(/'/g, '-'); 
+       
+       console.log('[Scanner] Heuristic Fix applied:', fixed);
+       data = fixed;
+    }
+    
     let recordId = '';
 
-    // Intentamos detectar el nuevo formato simplificado PC1|ID o PP1|ID
-    if (data.startsWith('PC1|') || data.startsWith('PP1|')) {
-      recordId = data.split('|')[1];
+    // Intentamos detectar el nuevo formato simplificado PC1|ID o PP1|ID o PQ1|ID
+    // Also handle mangled versions like PC1]ID
+    const simplifiedMatch = data.match(/P[CPQ]1[|\]](.+)/i);
+    if (simplifiedMatch) {
+      recordId = simplifiedMatch[1].replace(/'/g, '-');
     } else {
       // Fallback para el formato JSON antiguo (compatibilidad con tiquetes ya impresos)
       try {
-        const parsed = JSON.parse(data);
-        if ((parsed.v === 'POCHI-PARK-V1' || parsed.v === 'PC-PARK-V1') && parsed.id) {
-          recordId = parsed.id;
+        // Simple regex extraction as a safe fallback for corrupted JSON
+        const idMatch = data.match(/"id":"([^"]+)"/) || data.match(/id":"([^"]+)"/) || data.match(/id:([^,}\s]+)/);
+        if (idMatch) {
+          recordId = idMatch[1].replace(/'/g, '-'); // Fix common UUID dash issue
+        } else {
+          // If the string contains POCHI but JSON fails, it's likely a mangled JSON
+          if (data.includes('POCHI')) {
+             const uuidFallback = data.match(/[a-f0-9]{8}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{12}/i);
+             if (uuidFallback) recordId = uuidFallback[0].replace(/'/g, '-');
+          } else {
+             const parsed = JSON.parse(data);
+             if ((parsed.v === 'POCHI-PARK-V1' || parsed.v === 'PC-PARK-V1') && parsed.id) {
+               recordId = parsed.id;
+             }
+          }
         }
       } catch (e) {
-        // No es JSON ni formato nuevo
+        // Last resort: extract anything that looks like a UUID
+        const uuidMatch = data.match(/[a-f0-9]{8}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{12}/i);
+        if (uuidMatch) recordId = uuidMatch[0].replace(/'/g, '-');
       }
     }
 
@@ -125,21 +164,18 @@ export const ExitView: React.FC<ExitViewProps> = ({
         if (completed) {
           setErrorMsg("🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida.");
         } else {
-          setErrorMsg("⚠️ El vehículo no se encuentra activo en el sistema.");
+          setErrorMsg(`⚠️ El vehículo con ID ${recordId.substring(0,8)}... no se encuentra activo.`);
         }
       }
     } else {
       // If it's not a recognized QR format, try to treat it as a plate number
-      const record = activeRecords.find(r => r.plate.toUpperCase() === data.toUpperCase());
+      // We clean the plate and check
+      const cleanPlate = data.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const record = activeRecords.find(r => r.plate.toUpperCase() === cleanPlate);
       if (record) {
         setSelectedRecord(record);
       } else {
-        const completed = records.find(r => r.plate.toUpperCase() === data.toUpperCase() && r.status === 'COMPLETED');
-        if (completed) {
-          setErrorMsg("🛑 Este vehículo ya completó su estadía y salió del parqueadero.");
-        } else {
-          setErrorMsg("⚠️ Código QR desconocido o no válido.");
-        }
+        setErrorMsg("⚠️ Código QR no reconocido o vehículo no encontrado.");
       }
     }
   };
@@ -186,7 +222,8 @@ export const ExitView: React.FC<ExitViewProps> = ({
         entryTime: selectedRecord.entryTime,
         exitTime: Date.now(),
         vehicleState: selectedRecord.vehicleState,
-        leavesHelmet: selectedRecord.leavesHelmet
+        leavesHelmet: selectedRecord.leavesHelmet,
+        helmetLocation: selectedRecord.helmetLocation
       },
       cost: finalCost,
       subtotal,
@@ -202,6 +239,11 @@ export const ExitView: React.FC<ExitViewProps> = ({
     setShowPaymentModal(false);
     setSelectedRecord(null);
     setSearchValue('');
+    
+    // Auto-focus search for next exit
+    setTimeout(() => {
+        searchInputRef.current?.focus();
+    }, 500);
   };
 
   return (
@@ -290,7 +332,14 @@ export const ExitView: React.FC<ExitViewProps> = ({
                 type="text"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        handleSearch();
+                        (e.target as HTMLInputElement).blur();
+                    } else if (e.key === 'Escape') {
+                        (e.target as HTMLInputElement).blur();
+                    }
+                }}
                 placeholder="ABC123"
                 className="w-full pl-12 pr-4 py-4 bg-[#FFF] border-2 border-orange-100 rounded-2xl focus:border-orange-500 outline-none font-bold text-xl tracking-widest text-gray-800 transition-all placeholder-orange-200"
               />
@@ -343,6 +392,38 @@ export const ExitView: React.FC<ExitViewProps> = ({
                   <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
                     <span className="text-slate-500 font-bold text-sm">Cédula Propietario</span>
                     <span className="text-slate-800 font-black text-lg">{selectedRecord.ownerId || 'N/A'}</span>
+                  </div>
+                  {/* Helmet Info */}
+                  <div className={`p-4 rounded-2xl border-2 transition-all ${selectedRecord.leavesHelmet ? 'bg-orange-50 border-orange-200 shadow-sm' : 'bg-slate-50 border-transparent opacity-50'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="flex items-center gap-2 text-slate-500 font-bold text-sm">
+                        <HardHat size={16} className={selectedRecord.leavesHelmet ? 'text-orange-500' : 'text-slate-400'} /> 
+                        Registro de Casco
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedRecord.leavesHelmet ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-200 text-slate-500'}`}>
+                        {selectedRecord.leavesHelmet ? 'SÍ TIENE CASCO' : 'SIN CASCO'}
+                      </span>
+                    </div>
+                    {selectedRecord.leavesHelmet && (
+                      <div className="space-y-4 pt-4 border-t border-orange-200/50">
+                        <div className="bg-orange-600 p-5 rounded-2xl text-white shadow-xl shadow-orange-900/20 text-center animate-pulse border-2 border-white/20">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Entregar Casco del Lugar:</p>
+                          <h4 className="text-4xl font-black italic tracking-tighter uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                            {selectedRecord.helmetLocation || 'SIN ASIGNAR'}
+                          </h4>
+                        </div>
+                        {selectedRecord.helmetDescription && (
+                          <div className="bg-orange-100/50 flex items-center gap-3 p-4 rounded-xl border border-orange-200">
+                             <div className="bg-white p-2 rounded-lg shadow-sm">
+                               <HardHat size={16} className="text-orange-600" />
+                             </div>
+                             <p className="text-xs text-orange-900 font-black italic leading-tight">
+                               "{selectedRecord.helmetDescription}"
+                             </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

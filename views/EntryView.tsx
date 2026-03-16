@@ -3,7 +3,7 @@ import { VehicleCard } from '../components/VehicleCard';
 import { ParkingTicketQR } from '../components/ParkingTicketQR';
 
 import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS } from '../types';
-import { useVoice } from '../hooks/useVoice';
+
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar, Clock, Star, MessageSquare, HardHat } from 'lucide-react';
 import { PrinterConfig } from '../components/PrinterSettingsModal';
@@ -21,7 +21,8 @@ interface EntryViewProps {
         vehicleState?: 'BUENO' | 'REGULAR' | 'MALO',
         vehicleComment?: string,
         leavesHelmet?: boolean,
-        helmetDescription?: string
+        helmetDescription?: string,
+        helmetLocation?: string
     ) => { record: ParkingRecord | null, error?: string };
     onBackToSelector: () => void;
     onCancelEntry: (recordId: string) => void;
@@ -47,7 +48,6 @@ export const EntryView: React.FC<EntryViewProps> = ({
     documentConfig,
     keyboardShortcuts
 }) => {
-    const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIdInput, setOwnerIdInput] = useState('');
     const [isAccessibilityMode, setIsAccessibilityMode] = useState(false);
@@ -61,6 +61,54 @@ export const EntryView: React.FC<EntryViewProps> = ({
     const [vehicleComment, setVehicleComment] = useState('');
     const [leavesHelmet, setLeavesHelmet] = useState(false);
     const [helmetDescription, setHelmetDescription] = useState('');
+    const [helmetLocation, setHelmetLocation] = useState('');
+
+    // Next available helmet slot suggestion (Espacio 1, 2, 3...)
+    const nextHelmetSlot = React.useMemo(() => {
+        const activeHelmetLocations = records
+            .filter(r => r.status === 'ACTIVE' && r.helmetLocation)
+            .map(r => r.helmetLocation!);
+        
+        const spaces = activeHelmetLocations
+            .map(loc => {
+                const match = loc.match(/Espacio\s+(\d+)/i);
+                return match ? parseInt(match[1]) : null;
+            })
+            .filter((n): n is number => n !== null);
+        
+        const maxSpace = spaces.length > 0 ? Math.max(...spaces) : 0;
+        return `Espacio ${maxSpace + 1}`;
+    }, [records]);
+
+    useEffect(() => {
+        if (leavesHelmet && !helmetLocation) {
+            setHelmetLocation(nextHelmetSlot);
+        } else if (!leavesHelmet) {
+            setHelmetLocation('');
+        }
+    }, [leavesHelmet, nextHelmetSlot]);
+
+    // Auto-detect vehicle type from plate pattern (Colombian format)
+    useEffect(() => {
+        const plate = manualPlate.toUpperCase();
+        if (plate.length >= 6) {
+            const isMotoPattern = /^[A-Z]{3}[0-9]{2}[A-Z]$/.test(plate);
+            const isCarPattern = /^[A-Z]{3}[0-9]{3}$/.test(plate);
+            
+            if (isMotoPattern && manualType !== VehicleType.MOTORCYCLE) {
+                setManualType(VehicleType.MOTORCYCLE);
+            } else if (isCarPattern && manualType !== VehicleType.CAR) {
+                setManualType(VehicleType.CAR);
+            }
+        }
+    }, [manualPlate, manualType]);
+
+    // Auto-focus on mount
+    useEffect(() => {
+        setTimeout(() => {
+            plateInputRef.current?.focus();
+        }, 300);
+    }, []);
 
 
 
@@ -104,6 +152,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
         ownerId: string;
         vehicleType: VehicleType;
         entryTime: number;
+        helmetLocation?: string;
     } | null>(null);
 
     // Feedback State
@@ -122,6 +171,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
         specialRate?: SpecialRate;
         vehicleState?: 'BUENO' | 'REGULAR' | 'MALO';
         leavesHelmet?: boolean;
+        helmetLocation?: string;
     } | null>(null);
 
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
@@ -176,7 +226,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
 
         if (!validatePlate(manualPlate, manualType) && !isSpecialPlate) {
             setErrorMsg("⚠️ Placa no válida. Formato incorrecto.");
-            speak("Placa no válida");
+
             return;
         }
 
@@ -198,20 +248,16 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 vehicleState,
                 vehicleComment.trim(),
                 manualType === VehicleType.MOTORCYCLE ? leavesHelmet : false,
-                manualType === VehicleType.MOTORCYCLE ? helmetDescription.trim() : ''
+                manualType === VehicleType.MOTORCYCLE ? helmetDescription.trim() : '',
+                manualType === VehicleType.MOTORCYCLE ? helmetLocation.trim() : ''
             );
 
             if (resultRecord) {
                 if (specialRate) {
                     const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
                     if (isExpired) {
-                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido.`);
                         setErrorMsg(`⚠️ La mensualidad para la placa ${manualPlate.toUpperCase()} ha VENCIDO. Se le cobrará tarifa normal.`);
-                    } else {
-                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${manualPlate.toUpperCase()}.`);
                     }
-                } else {
-                    speak(`Bienvenido a Rossember Parking.`);
                 }
 
                 setLastProcessed({
@@ -225,7 +271,8 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     recordId: resultRecord.id,
                     specialRate: specialRate || undefined,
                     vehicleState: vehicleState,
-                    leavesHelmet: manualType === VehicleType.MOTORCYCLE ? leavesHelmet : undefined
+                    leavesHelmet: manualType === VehicleType.MOTORCYCLE ? leavesHelmet : undefined,
+                    helmetLocation: manualType === VehicleType.MOTORCYCLE ? helmetLocation : undefined
                 });
 
                 // Show QR ticket
@@ -235,6 +282,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     ownerId: ownerIdInput.trim(),
                     vehicleType: finalType,
                     entryTime: resultRecord.entryTime,
+                    helmetLocation: manualType === VehicleType.MOTORCYCLE ? helmetLocation.trim() : ''
                 });
                 setShowTicket(true);
 
@@ -247,9 +295,15 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 setVehicleComment('');
                 setLeavesHelmet(false);
                 setHelmetDescription('');
+                setHelmetLocation('');
+                
+                // Auto-focus plate for next entry
+                setTimeout(() => {
+                    plateInputRef.current?.focus();
+                }, 500);
             } else {
                 setErrorMsg(processError || "⚠️ No hay plazas disponibles o el vehículo ya está registrado.");
-                speak(processError || "Lo sentimos, no hay plazas disponibles.");
+
             }
             setIsProcessing(false);
         }, 500);
@@ -277,6 +331,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     ownerId={ticketData.ownerId}
                     vehicleType={ticketData.vehicleType}
                     entryTime={ticketData.entryTime}
+                    helmetLocation={ticketData.helmetLocation}
                     onClose={() => setShowTicket(false)}
                     printerConfig={printerConfig}
                     documentConfig={documentConfig}
@@ -439,6 +494,14 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         type="text"
                                         value={manualPlate}
                                         onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleManualSubmit();
+                                                (e.target as HTMLInputElement).blur();
+                                            } else if (e.key === 'Escape') {
+                                                (e.target as HTMLInputElement).blur();
+                                            }
+                                        }}
                                         placeholder={manualType === VehicleType.BICYCLE ? 'BICI-001 o libre' : 'AAA123'}
                                         maxLength={10}
                                         className="w-full text-center text-4xl font-mono font-bold uppercase py-5 bg-white border-2 border-blue-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder-gray-300 cursor-pointer"
@@ -497,6 +560,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                             type="text"
                                             value={vehicleComment}
                                             onChange={(e) => setVehicleComment(e.target.value)}
+                                            onKeyDown={(e) => (e.key === 'Escape' || e.key === 'Enter') && (e.target as HTMLInputElement).blur()}
                                             placeholder="Ej: Rayón en puerta derecha"
                                             className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-gray-800"
                                         />
@@ -519,13 +583,24 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                 </button>
                                             </div>
                                             {leavesHelmet && (
-                                                <input
-                                                    type="text"
-                                                    value={helmetDescription}
-                                                    onChange={(e) => setHelmetDescription(e.target.value)}
-                                                    placeholder="Descripción del casco (color, marca...)"
-                                                    className="w-full px-4 py-3 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition-all text-gray-800"
-                                                />
+                                                <>
+                                                    <input
+                                                        type="text"
+                                                        value={helmetDescription}
+                                                        onChange={(e) => setHelmetDescription(e.target.value)}
+                                                        onKeyDown={(e) => (e.key === 'Escape' || e.key === 'Enter') && (e.target as HTMLInputElement).blur()}
+                                                        placeholder="Descripción del casco (color, marca...)"
+                                                        className="w-full px-4 py-3 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition-all text-gray-800"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={helmetLocation}
+                                                        onChange={(e) => setHelmetLocation(e.target.value)}
+                                                        onKeyDown={(e) => (e.key === 'Escape' || e.key === 'Enter') && (e.target as HTMLInputElement).blur()}
+                                                        placeholder="Ej: Espacio 1 (Lugar o Número)"
+                                                        className="w-full px-4 py-3 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition-all text-gray-800 font-bold"
+                                                    />
+                                                </>
                                             )}
                                         </div>
                                     )}
@@ -616,9 +691,16 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                 </span>
                                             )}
                                             {lastProcessed.leavesHelmet && (
-                                                <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200 flex items-center gap-1">
-                                                    <HardHat size={12} /> CON CASCO
-                                                </span>
+                                                <div className="flex flex-col gap-1 w-full">
+                                                    <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200 flex items-center gap-1 w-fit">
+                                                        <HardHat size={12} /> CON CASCO
+                                                    </span>
+                                                    {lastProcessed.helmetLocation && (
+                                                        <span className="text-orange-900 font-black text-sm bg-orange-200/50 px-3 py-1 rounded-xl border border-orange-300 w-fit">
+                                                            📍 UBICACIÓN: {lastProcessed.helmetLocation}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
 

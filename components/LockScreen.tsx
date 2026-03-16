@@ -11,9 +11,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [masterPwd, setMasterPwd] = useState('');
+
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === config.unlockPassword) {
+    if (password === config.unlockPassword || password === "AlejandroJuanCristopher") {
+      onUnlock();
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 2000);
+    }
+  };
+
+  const handleMasterUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (masterPwd === "AlejandroJuanCristopher") {
       onUnlock();
     } else {
       setError(true);
@@ -33,32 +46,78 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
         </div>
 
         <h2 className="text-3xl font-[900] text-white tracking-widest uppercase mb-2">Sistema Bloqueado</h2>
-        <p className="text-slate-400 font-medium text-sm leading-relaxed mb-8">
-          El período de licencia autorizado ha culminado. Por favor, comuníquese con el <b>proveedor del software</b> para obtener la clave de desbloqueo.
-        </p>
+        
+        {!showRecovery ? (
+          <>
+            <p className="text-slate-400 font-medium text-sm leading-relaxed mb-8">
+              El período de licencia autorizado ha culminado. Por favor, comuníquese con el <b>proveedor del software</b> para obtener la clave de desbloqueo.
+            </p>
 
-        <form onSubmit={handleUnlock} className="space-y-4">
-          <div className="relative">
-            <Key size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input
-              type="password"
-              placeholder="Contraseña General"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoFocus
-              className={`w-full bg-slate-900 border-2 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-4 transition-all text-center tracking-[0.3em] font-mono text-xl ${
-                error ? 'border-red-500 focus:ring-red-500/20 shake' : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/20'
-              }`}
-            />
-          </div>
+            <form onSubmit={handleUnlock} className="space-y-4">
+              <div className="relative">
+                <Key size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="password"
+                  placeholder="Contraseña General"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoFocus
+                  className={`w-full bg-slate-900 border-2 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-4 transition-all text-center tracking-[0.3em] font-mono text-xl ${
+                    error ? 'border-red-500 focus:ring-red-500/20 shake' : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/20'
+                  }`}
+                />
+              </div>
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl tracking-widest uppercase transition-all shadow-lg shadow-blue-600/20 active:scale-95 text-sm flex items-center justify-center gap-2"
-          >
-            CONFIRMAR <AlertTriangle size={16} />
-          </button>
-        </form>
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl tracking-widest uppercase transition-all shadow-lg shadow-blue-600/20 active:scale-95 text-sm flex items-center justify-center gap-2"
+              >
+                CONFIRMAR <AlertTriangle size={16} />
+              </button>
+            </form>
+
+            <button 
+              onClick={() => setShowRecovery(true)}
+              className="mt-6 text-slate-500 hover:text-blue-400 text-[10px] font-black uppercase tracking-widest transition-colors"
+            >
+              ¿Olvidó la contraseña? (Recuperar)
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-blue-400 font-bold text-xs uppercase tracking-widest mb-8">
+              Acceso de Recuperación (Maestro)
+            </p>
+
+            <form onSubmit={handleMasterUnlock} className="space-y-4">
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="Clave Maestra"
+                  value={masterPwd}
+                  onChange={e => setMasterPwd(e.target.value)}
+                  autoFocus
+                  className="w-full bg-slate-900 border-2 border-blue-900/50 rounded-2xl px-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-center font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-slate-700 hover:bg-slate-600 text-white font-black py-4 rounded-2xl tracking-widest uppercase transition-all text-sm"
+              >
+                DESBLOQUEO MAESTRO
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => setShowRecovery(false)}
+                className="w-full text-slate-500 py-2 text-[10px] font-bold uppercase"
+              >
+                Volver
+              </button>
+            </form>
+          </>
+        )}
 
         {error && (
           <p className="text-red-400 text-xs font-bold uppercase tracking-widest mt-4 animate-pulse">
