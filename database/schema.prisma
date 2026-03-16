@@ -1,0 +1,352 @@
+// ============================================================
+//  ROSSEMBER PARKING LITE — Esquema Prisma ORM
+//  Motor: SQLite (archivo único rossember_parking.db)
+//  Compatible con: Electron + better-sqlite3 / Tauri
+//
+//  Para inicializar:
+//    npx prisma migrate dev --name inicio
+//    npx prisma generate
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+  // En .env poner: DATABASE_URL="file:./rossember_parking.db"
+  // El archivo .db se crea automáticamente al hacer migrate
+}
+
+// ============================================================
+//  PARQUEADERO — Datos del negocio
+// ============================================================
+model Parqueadero {
+  id_parqueadero  String   @id @default(cuid())
+  nombre_negocio  String
+  nit             String?
+  direccion       String?
+  telefono        String?
+  activo          Boolean  @default(true)
+  fecha_creacion  DateTime @default(now())
+
+  // Relaciones
+  usuarios_admin            UsuarioAdmin[]
+  pisos                     Piso[]
+  registros_vehiculos       RegistroVehiculo[]
+  tarifas_especiales        TarifaEspecial[]
+  vehiculos_vetados         VehiculoVetado[]
+  configuracion_tarifas     ConfiguracionTarifas?
+  configuracion_documentos  ConfiguracionDocumentos?
+  configuracion_impresora   ConfiguracionImpresora?
+  configuracion_escaner     ConfiguracionEscaner?
+  atajos_teclado            AtajosTeclado?
+  configuracion_licencia    ConfiguracionLicencia?
+
+  @@map("parqueadero")
+}
+
+// ============================================================
+//  USUARIOS ADMIN
+// ============================================================
+model UsuarioAdmin {
+  id_usuario       String   @id @default(cuid())
+  id_parqueadero   String
+  usuario          String   @unique
+  contrasena_hash  String   // bcrypt. NUNCA texto plano.
+  rol              String   @default("admin")
+  // 'superadmin' | 'admin' | 'operario'
+  activo           Boolean  @default(true)
+  fecha_creacion   DateTime @default(now())
+
+  parqueadero       Parqueadero      @relation(fields: [id_parqueadero], references: [id_parqueadero], onDelete: Cascade)
+  vehiculos_vetados VehiculoVetado[]
+
+  @@map("usuarios_admin")
+}
+
+// ============================================================
+//  PISOS — Sectores del parqueadero
+// ============================================================
+model Piso {
+  id_piso         String   @id @default(cuid())
+  id_parqueadero  String
+  nombre          String
+  orden           Int      @default(0)
+  activo          Boolean  @default(true)
+
+  parqueadero         Parqueadero         @relation(fields: [id_parqueadero], references: [id_parqueadero], onDelete: Cascade)
+  capacidades         CapacidadPiso[]
+  registros_vehiculos RegistroVehiculo[]
+
+  @@map("pisos")
+}
+
+// ============================================================
+//  CAPACIDADES PISO — Cuántos espacios hay
+// ============================================================
+model CapacidadPiso {
+  id_capacidad      String  @id @default(cuid())
+  id_piso           String
+  tipo_vehiculo     String
+  // 'CARRO_REGULAR' | 'CARRO_PRIORITARIO' | 'MOTO' | 'CARGA_ELECTRICA' | 'BICICLETA'
+  capacidad_maxima  Int
+  // -1 = Ilimitado
+  prefijo_puesto    String
+  // 'C' | 'P' | 'M' | 'E' | 'B'
+
+  piso  Piso  @relation(fields: [id_piso], references: [id_piso], onDelete: Cascade)
+
+  @@map("capacidades_piso")
+}
+
+// ============================================================
+//  TARIFAS ESPECIALES — Mensualidades y descuentos
+// ============================================================
+model TarifaEspecial {
+  id_tarifa            String    @id @default(cuid())
+  id_parqueadero       String
+  placa                String
+  cedula_propietario   String?
+  tipo_tarifa          String
+  // 'Mensualidad' | 'Descuento' | 'Empleado' | 'Otro'
+  valor                Float
+  // Si Mensualidad: valor pagado. Si Descuento: porcentaje 0-100
+  descripcion          String?
+  fecha_vencimiento    DateTime?
+  activa               Boolean   @default(true)
+  fecha_creacion       DateTime  @default(now())
+
+  parqueadero          Parqueadero        @relation(fields: [id_parqueadero], references: [id_parqueadero])
+  registros_vehiculos  RegistroVehiculo[]
+
+  @@index([placa, activa])
+  @@map("tarifas_especiales")
+}
+
+// ============================================================
+//  REGISTROS VEHICULOS ⭐ — LA TABLA MÁS IMPORTANTE
+//  Cada fila = un vehículo que entró al parqueadero
+// ============================================================
+model RegistroVehiculo {
+  id_registro                 String    @id @default(cuid())
+  // Este ID va codificado en el tiquete QR (formato "PC1|ID")
+  id_parqueadero              String
+  id_piso                     String?
+
+  // Datos del vehículo
+  placa                       String
+  cedula_propietario          String?
+  tipo_vehiculo               String
+  // 'Carro' | 'Moto' | 'Bicicleta' | 'Eléctrico'
+  numero_puesto               String?
+  // Ej: 'C-001', 'P1-M-003', 'E-002'
+
+  // Tiempos (Int = milisegundos Unix, compatible con Date.now() de JS)
+  hora_entrada                Int
+  hora_salida                 Int?
+
+  // Estado: 'ACTIVO' | 'COMPLETADO'
+  estado                      String    @default("ACTIVO")
+
+  // Características del ingreso
+  es_prioritario              Boolean   @default(false)
+  requiere_carga_electrica    Boolean   @default(false)
+
+  // Estado físico: 'BUENO' | 'REGULAR' | 'MALO'
+  estado_vehiculo             String?
+  observaciones               String?
+
+  // Casco (solo motos)
+  deja_casco                  Boolean   @default(false)
+  descripcion_casco           String?
+
+  // Cobro
+  costo_total                 Float?
+  costo_sin_descuento         Float?
+  valor_iva                   Float?    @default(0)
+  // 'PENDIENTE' | 'PAGADO' | 'ANULADO_ADMIN'
+  estado_pago                 String?
+  // 'Efectivo' | 'Tarjeta' | 'Nequi' | 'Manual - Admin' | 'GRACIA'
+  metodo_pago                 String?
+
+  // Tarifa especial
+  id_tarifa_especial          String?
+  etiqueta_tarifa_especial    String?
+  // 'Mensualidad Activa' | 'Empleado: 30%'
+
+  fecha_registro              DateTime  @default(now())
+
+  // Relaciones
+  parqueadero        Parqueadero       @relation(fields: [id_parqueadero], references: [id_parqueadero])
+  piso               Piso?             @relation(fields: [id_piso], references: [id_piso])
+  tarifa_especial    TarifaEspecial?   @relation(fields: [id_tarifa_especial], references: [id_tarifa])
+  transacciones_pago TransaccionPago[]
+
+  @@index([placa, estado])
+  @@index([hora_entrada])
+  @@index([id_parqueadero, estado])
+  @@map("registros_vehiculos")
+}
+
+// ============================================================
+//  TRANSACCIONES PAGO — Detalle del cobro en taquilla
+// ============================================================
+model TransaccionPago {
+  id_transaccion     String   @id @default(cuid())
+  id_registro        String
+  metodo_pago        String?
+  // 'Efectivo' | 'Tarjeta' | 'Nequi'
+  monto_pagado       Float
+  monto_iva          Float    @default(0)
+  efectivo_recibido  Float?   // Solo Efectivo: cuánto dio el cliente
+  cambio_entregado   Float?   // Solo Efectivo: vueltas dadas
+  estado             String   @default("PAGADO")
+  fecha_pago         DateTime @default(now())
+
+  registro  RegistroVehiculo  @relation(fields: [id_registro], references: [id_registro])
+
+  @@map("transacciones_pago")
+}
+
+// ============================================================
+//  VEHICULOS VETADOS — Lista negra
+// ============================================================
+model VehiculoVetado {
+  id_veto         String   @id @default(cuid())
+  id_parqueadero  String
+  placa           String
+  motivo_veto     String
+  vetado_por      String?
+  fecha_veto      DateTime @default(now())
+
+  parqueadero  Parqueadero   @relation(fields: [id_parqueadero], references: [id_parqueadero])
+  admin        UsuarioAdmin? @relation(fields: [vetado_por], references: [id_usuario])
+
+  @@unique([id_parqueadero, placa])
+  @@map("vehiculos_vetados")
+}
+
+// ============================================================
+//  CONFIGURACION TARIFAS — Precios del parqueadero
+// ============================================================
+model ConfiguracionTarifas {
+  id_config                           String   @id @default(cuid())
+  id_parqueadero                      String   @unique
+  tarifa_carro_por_minuto             Float    @default(85)
+  tarifa_plena_carro_dia              Float    @default(35000)
+  tarifa_moto_por_minuto              Float    @default(55)
+  tarifa_plena_moto_dia               Float    @default(18000)
+  tarifa_bicicleta_por_minuto         Float    @default(30)
+  tarifa_plena_bicicleta_dia          Float    @default(8000)
+  tarifa_carga_electrica_por_minuto   Float    @default(120)
+  porcentaje_descuento_prioritario    Float    @default(50)
+  minutos_gracia                      Int      @default(15)
+  iva_habilitado                      Boolean  @default(false)
+  porcentaje_iva                      Float    @default(19)
+  ultima_actualizacion                DateTime @default(now()) @updatedAt
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("configuracion_tarifas")
+}
+
+// ============================================================
+//  CONFIGURACION DOCUMENTOS — Tiquetes y Facturas
+// ============================================================
+model ConfiguracionDocumentos {
+  id_config           String   @id @default(cuid())
+  id_parqueadero      String   @unique
+  nombre_empresa      String?  @default("Rossember Parking")
+  nit                 String?
+  direccion           String?
+  telefono            String?
+  info_legal          String?
+  pie_tiquete         String?
+  pie_factura         String?
+  mostrar_marca_agua  Boolean  @default(true)
+  logo_base64         String?  // clientLogo en localStorage
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("configuracion_documentos")
+}
+
+// ============================================================
+//  CONFIGURACION IMPRESORA
+// ============================================================
+model ConfiguracionImpresora {
+  id_config              String   @id @default(cuid())
+  id_parqueadero         String   @unique
+  nombre_impresora       String?  @default("Impresora Térmica")
+  tipo_conexion          String   @default("USB")
+  // 'USB' | 'NETWORK' | 'BLUETOOTH'
+  direccion_ip           String?
+  puerto                 Int?     @default(9100)
+  ancho_papel_mm         Int      @default(80)
+  // 58 | 80 | 104 | 216
+  formato_papel          String   @default("TICKET")
+  // 'TICKET' | 'HALF' | 'LETTER' | 'A4'
+  impresion_automatica   Boolean  @default(false)
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("configuracion_impresora")
+}
+
+// ============================================================
+//  CONFIGURACION ESCANER — Lector QR/Barras externo
+// ============================================================
+model ConfiguracionEscaner {
+  id_config       String   @id @default(cuid())
+  id_parqueadero  String   @unique
+  habilitado      Boolean  @default(false)
+  prefijo         String?
+  sufijo          String?  @default("Enter")
+  captura_global  Boolean  @default(true)
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("configuracion_escaner")
+}
+
+// ============================================================
+//  ATAJOS TECLADO — Teclas de acceso rápido F1-F12
+// ============================================================
+model AtajosTeclado {
+  id_config               String  @id @default(cuid())
+  id_parqueadero          String  @unique
+  registrar_entrada       String  @default("F2")
+  enfocar_campo_placa     String  @default("F3")
+  seleccionar_carro       String  @default("F4")
+  seleccionar_moto        String  @default("F5")
+  seleccionar_bicicleta   String  @default("F6")
+  activar_prioritario     String  @default("F7")
+  enfocar_busqueda        String  @default("F8")
+  abrir_escaner           String  @default("F9")
+  confirmar_pago          String  @default("F10")
+  cambiar_a_entrada       String  @default("F1")
+  cambiar_a_salida        String  @default("F12")
+  imprimir_documento      String  @default("F11")
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("atajos_teclado")
+}
+
+// ============================================================
+//  CONFIGURACION LICENCIA — Bloqueo por fecha (time bomb)
+// ============================================================
+model ConfiguracionLicencia {
+  id_config               String   @id @default(cuid())
+  id_parqueadero          String   @unique
+  activa                  Boolean  @default(false)
+  fecha_expiracion        Int?
+  // Milisegundos Unix (compatible con Date.now() de JS). NULL = sin límite
+  contrasena_desbloqueo   String?  @default("12345")
+
+  parqueadero  Parqueadero  @relation(fields: [id_parqueadero], references: [id_parqueadero])
+
+  @@map("configuracion_licencia")
+}
