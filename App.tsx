@@ -1,4 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import {
+  cargarRegistros, crearRegistro, actualizarRegistro, eliminarRegistro, purgarRegistros,
+  cargarTarifas, guardarTarifas,
+  cargarPisos, guardarPisos,
+  cargarTarifasEspeciales, guardarTarifasEspeciales,
+  cargarVetados, guardarVetados,
+  cargarConfigDocumentos, guardarConfigDocumentos,
+  cargarConfigImpresora, guardarConfigImpresora,
+  cargarConfigEscaner, guardarConfigEscaner,
+  cargarAtajos, guardarAtajos,
+  cargarLicencia, guardarLicencia,
+} from './src/services/electronDB';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { DeviceSelector } from './components/DeviceSelector';
 import { EntryView } from './views/EntryView';
@@ -70,83 +82,78 @@ const AppContent: React.FC = () => {
     return sessionStorage.getItem('adminAuth') === 'true';
   });
 
-  // Core State
-  const [records, setRecords] = useState<ParkingRecord[]>(() => {
-    const saved = localStorage.getItem('parkingRecords');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // ── Estado de carga inicial ──────────────────────────────────────────────
+  const [dbReady, setDbReady] = useState(false);
 
-  const [rates, setRates] = useState<Record<string, number>>(() => {
-    const savedRates = localStorage.getItem('parkingRates');
-    return savedRates ? JSON.parse(savedRates) : DEFAULT_RATES;
-  });
-
-  const [floors, setFloors] = useState<Floor[]>(() => {
-    const savedFloors = localStorage.getItem('parkingFloors');
-    if (savedFloors) return JSON.parse(savedFloors);
-
-    const savedCapacities = localStorage.getItem('parkingCapacities');
-    if (savedCapacities) {
-      return [{
-        id: 'floor-1',
-        name: 'Piso 1',
-        capacities: { ...DEFAULT_CAPACITIES, ...JSON.parse(savedCapacities) },
-        prefixes: DEFAULT_PREFIXES
-      }];
-    }
-
-    return DEFAULT_FLOORS;
-  });
-
-  const [specialRates, setSpecialRates] = useState<SpecialRate[]>(() => {
-    const saved = localStorage.getItem('specialRates');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [bannedVehicles, setBannedVehicles] = useState<BannedVehicle[]>(() => {
-    const saved = localStorage.getItem('bannedVehicles');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // Core State — se inicializan vacíos y se llenan desde la BD en el useEffect de inicio
+  const [records, setRecords] = useState<ParkingRecord[]>([]);
+  const [rates, setRates] = useState<Record<string, number>>(DEFAULT_RATES);
+  const [floors, setFloors] = useState<Floor[]>(DEFAULT_FLOORS);
+  const [specialRates, setSpecialRates] = useState<SpecialRate[]>([]);
+  const [bannedVehicles, setBannedVehicles] = useState<BannedVehicle[]>([]);
 
   // Client Customization State
-  const [clientLogo, setClientLogo] = useState<string | null>(() => {
-    return localStorage.getItem('clientLogo');
+  const [clientLogo, setClientLogo] = useState<string | null>(null);
+  const [printerConfig, setPrinterConfig] = useState<any>(null);
+  const [hardwareScannerConfig, setHardwareScannerConfig] = useState<HardwareScannerConfig>(
+    { enabled: false, prefix: '', suffix: 'Enter', captureGlobally: true }
+  );
+  const [documentConfig, setDocumentConfig] = useState<DocumentConfig>({
+    businessName: 'Rossember Parking',
+    nit: '900.123.456-7',
+    address: 'Calle Ficticia 123, Bogotá',
+    phone: '300 123 4567',
+    legalInfo: 'SISTEMA INTEGRAL DE GESTIÓN DE PARQUEADERO',
+    ticketFooter: 'Conserve este tiquete. Se requiere para registrar la salida.',
+    invoiceFooter: 'Gracias por su visita. Este documento es equivalente a factura.',
+    showWatermark: true
   });
+  const [keyboardShortcuts, setKeyboardShortcuts] = useState<KeyboardShortcutsConfig>(DEFAULT_SHORTCUTS);
+  const [licenseConfig, setLicenseConfig] = useState<LicenseConfig | null>(
+    { isActive: false, expirationDate: null, unlockPassword: '12345' }
+  );
 
-  const [printerConfig, setPrinterConfig] = useState<any>(() => {
-    const saved = localStorage.getItem('printerConfig');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // ── Carga inicial desde la BD (Electron) o localStorage (browser) ────────
+  useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        const [
+          dbRecords, dbRates, dbFloors, dbSpecialRates, dbBanned,
+          dbDocConfig, dbPrinter, dbScanner, dbShortcuts, dbLicense
+        ] = await Promise.all([
+          cargarRegistros(),
+          cargarTarifas(),
+          cargarPisos(),
+          cargarTarifasEspeciales(),
+          cargarVetados(),
+          cargarConfigDocumentos(),
+          cargarConfigImpresora(),
+          cargarConfigEscaner(),
+          cargarAtajos(),
+          cargarLicencia()
+        ]);
 
-  const [hardwareScannerConfig, setHardwareScannerConfig] = useState<HardwareScannerConfig>(() => {
-    const saved = localStorage.getItem('hardwareScannerConfig') || localStorage.getItem('qrReaderConfig');
-    return saved ? JSON.parse(saved) : { enabled: false, prefix: '', suffix: 'Enter', captureGlobally: true };
-  });
-
-  const [documentConfig, setDocumentConfig] = useState<DocumentConfig>(() => {
-    const saved = localStorage.getItem('documentConfig');
-    return saved ? JSON.parse(saved) : {
-      businessName: 'Rossember Parking',
-      nit: '900.123.456-7',
-      address: 'Calle Ficticia 123, Bogotá',
-      phone: '300 123 4567',
-      legalInfo: 'SISTEMA INTEGRAL DE GESTIÓN DE PARQUEADERO',
-      ticketFooter: 'Conserve este tiquete. Se requiere para registrar la salida.',
-      invoiceFooter: 'Gracias por su visita. Este documento es equivalente a factura.',
-      showWatermark: true
+        if (dbRecords?.length) setRecords(dbRecords);
+        if (dbRates) setRates(dbRates);
+        if (dbFloors?.length) setFloors(dbFloors);
+        if (dbSpecialRates?.length) setSpecialRates(dbSpecialRates);
+        if (dbBanned?.length) setBannedVehicles(dbBanned);
+        if (dbDocConfig) {
+          setDocumentConfig(dbDocConfig);
+          if (dbDocConfig.logo) setClientLogo(dbDocConfig.logo);
+        }
+        if (dbPrinter) setPrinterConfig(dbPrinter);
+        if (dbScanner) setHardwareScannerConfig(dbScanner);
+        if (dbShortcuts) setKeyboardShortcuts(prev => ({ ...prev, ...dbShortcuts }));
+        if (dbLicense) setLicenseConfig(dbLicense);
+      } catch (err) {
+        console.error('[App] Error cargando datos desde BD:', err);
+      } finally {
+        setDbReady(true);
+      }
     };
-  });
-
-  const [keyboardShortcuts, setKeyboardShortcuts] = useState<KeyboardShortcutsConfig>(() => {
-    const saved = localStorage.getItem('keyboardShortcuts');
-    return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
-  });
-
-  const [licenseConfig, setLicenseConfig] = useState<LicenseConfig | null>(() => {
-    const saved = localStorage.getItem('licenseConfig');
-    return saved ? JSON.parse(saved) : { isActive: false, expirationDate: null, unlockPassword: '12345' };
-  });
+    cargarDatos();
+  }, []);
 
   const [isLocked, setIsLocked] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
@@ -165,74 +172,41 @@ const AppContent: React.FC = () => {
     };
   }, { REGULAR_CAR: 0, PRIORITY_CAR: 0, MOTO: 0, EV_CHARGING: 0, BICYCLE: 0 });
 
-  // Persist data
-  useEffect(() => {
-    localStorage.setItem('parkingRecords', JSON.stringify(records));
-  }, [records]);
+  // ── Persistencia: guarda en BD (o localStorage como fallback) ───────────
+  // Solo persiste después de que la carga inicial esté completa (dbReady=true)
+  useEffect(() => { if (dbReady) guardarTarifas(rates); }, [rates, dbReady]);
+  useEffect(() => { if (dbReady) guardarPisos(floors); }, [floors, dbReady]);
+  useEffect(() => { if (dbReady) guardarTarifasEspeciales(specialRates); }, [specialRates, dbReady]);
+  useEffect(() => { if (dbReady) guardarVetados(bannedVehicles); }, [bannedVehicles, dbReady]);
+  useEffect(() => { if (dbReady) guardarConfigEscaner(hardwareScannerConfig); }, [hardwareScannerConfig, dbReady]);
+  useEffect(() => { if (dbReady) guardarAtajos(keyboardShortcuts); }, [keyboardShortcuts, dbReady]);
 
+  // Impresora y scanner
   useEffect(() => {
-    localStorage.setItem('parkingRates', JSON.stringify(rates));
-  }, [rates]);
+    if (dbReady) guardarConfigImpresora(printerConfig);
+  }, [printerConfig, dbReady]);
 
+  // Documentos + logo (el logo se guarda dentro del objeto documentConfig)
   useEffect(() => {
-    localStorage.setItem('parkingFloors', JSON.stringify(floors));
-  }, [floors]);
+    if (!dbReady) return;
+    guardarConfigDocumentos({ ...documentConfig, logo: clientLogo });
+  }, [documentConfig, clientLogo, dbReady]);
 
-
+  // Licencia
   useEffect(() => {
-    localStorage.setItem('specialRates', JSON.stringify(specialRates));
-  }, [specialRates]);
-
-  useEffect(() => {
-    localStorage.setItem('bannedVehicles', JSON.stringify(bannedVehicles));
-  }, [bannedVehicles]);
-
-  useEffect(() => {
-    if (clientLogo) {
-      localStorage.setItem('clientLogo', clientLogo);
-    } else {
-      localStorage.removeItem('clientLogo');
-    }
-  }, [clientLogo]);
-
-  useEffect(() => {
-    if (printerConfig) {
-      localStorage.setItem('printerConfig', JSON.stringify(printerConfig));
-    } else {
-      localStorage.removeItem('printerConfig');
-    }
-  }, [printerConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('hardwareScannerConfig', JSON.stringify(hardwareScannerConfig));
-  }, [hardwareScannerConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('documentConfig', JSON.stringify(documentConfig));
-  }, [documentConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('keyboardShortcuts', JSON.stringify(keyboardShortcuts));
-  }, [keyboardShortcuts]);
-
-  useEffect(() => {
+    if (!dbReady) return;
     if (!licenseConfig) {
-      localStorage.removeItem('licenseConfig');
       setIsLocked(false);
       return;
     }
-    localStorage.setItem('licenseConfig', JSON.stringify(licenseConfig));
-    // Check if we should be locked initially or whenever config changes
+    guardarLicencia(licenseConfig);
     if (licenseConfig.isActive && licenseConfig.expirationDate && Date.now() > licenseConfig.expirationDate) {
-      // Look if someone already unlocked it in this session (temporary)
       const sessionUnlocked = sessionStorage.getItem('softwareUnlocked') === 'true';
-      if (!sessionUnlocked) {
-        setIsLocked(true);
-      }
+      if (!sessionUnlocked) setIsLocked(true);
     } else {
       setIsLocked(false);
     }
-  }, [licenseConfig]);
+  }, [licenseConfig, dbReady]);
 
   // Periodic check for the "time bomb"
   useEffect(() => {
@@ -422,25 +396,22 @@ const AppContent: React.FC = () => {
     };
 
     setRecords(prev => [newRecord, ...prev]);
+    crearRegistro(newRecord).catch(err => console.error('[DB] Error al crear registro:', err));
     return { record: newRecord };
   };
 
   const handleCancelEntry = (recordId: string) => {
     setRecords(prev => prev.filter(r => r.id !== recordId));
+    eliminarRegistro(recordId).catch(err => console.error('[DB] Error al eliminar registro:', err));
   };
 
   const handleProcessPayment = (recordId: string, paymentMethod: string, email: string) => {
     setRecords(prev => prev.map(r => {
       if (r.id === recordId) {
         const { cost } = calculateCost(r.entryTime, r.vehicleType, r.isDisabled, r.requiresCharging);
-        return {
-          ...r,
-          status: 'COMPLETED' as const,
-          paymentStatus: 'PAID',
-          paymentMethod: paymentMethod,
-          cost: cost,
-          exitTime: Date.now()
-        };
+        const updated = { ...r, status: 'COMPLETED' as const, paymentStatus: 'PAID' as const, paymentMethod, cost, exitTime: Date.now() };
+        actualizarRegistro(updated).catch(err => console.error('[DB] Error al actualizar registro:', err));
+        return updated;
       }
       return r;
     }));
@@ -450,14 +421,9 @@ const AppContent: React.FC = () => {
   const handlePayAtBooth = (recordId: string, cost: number, paymentMethod: string) => {
     setRecords(prev => prev.map(r => {
       if (r.id === recordId) {
-        return {
-          ...r,
-          status: 'COMPLETED' as const,
-          paymentStatus: 'PAID' as const,
-          paymentMethod: paymentMethod,
-          cost: cost,
-          exitTime: Date.now()
-        };
+        const updated = { ...r, status: 'COMPLETED' as const, paymentStatus: 'PAID' as const, paymentMethod, cost, exitTime: Date.now() };
+        actualizarRegistro(updated).catch(err => console.error('[DB] Error al actualizar registro:', err));
+        return updated;
       }
       return r;
     }));
@@ -466,12 +432,9 @@ const AppContent: React.FC = () => {
   const handleRevertPayment = (recordId: string) => {
     setRecords(prev => prev.map(r => {
       if (r.id === recordId) {
-        return {
-          ...r,
-          paymentStatus: 'PENDING',
-          paymentMethod: undefined,
-          exitTime: undefined
-        };
+        const updated = { ...r, paymentStatus: 'PENDING' as const, paymentMethod: undefined, exitTime: undefined };
+        actualizarRegistro(updated).catch(err => console.error('[DB] Error al revertir pago:', err));
+        return updated;
       }
       return r;
     }));
@@ -480,11 +443,9 @@ const AppContent: React.FC = () => {
   const handleProcessExit = (recordId: string) => {
     setRecords(prev => prev.map(r => {
       if (r.id === recordId && r.status === 'ACTIVE') {
-        return {
-          ...r,
-          exitTime: Date.now(),
-          status: 'COMPLETED'
-        };
+        const updated = { ...r, exitTime: Date.now(), status: 'COMPLETED' as const };
+        actualizarRegistro(updated).catch(err => console.error('[DB] Error al procesar salida:', err));
+        return updated;
       }
       return r;
     }));
@@ -508,14 +469,9 @@ const AppContent: React.FC = () => {
       const { cost, exitTime } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled);
       setRecords(prev => prev.map(r => {
         if (r.id === id) {
-          return {
-            ...r,
-            exitTime: exitTime,
-            status: 'COMPLETED',
-            cost: cost,
-            paymentStatus: 'PAID',
-            paymentMethod: 'Manual - Admin'
-          };
+          const updated = { ...r, exitTime, status: 'COMPLETED' as const, cost, paymentStatus: 'PAID' as const, paymentMethod: 'Manual - Admin' };
+          actualizarRegistro(updated).catch(err => console.error('[DB] Error en salida manual:', err));
+          return updated;
         }
         return r;
       }));
@@ -551,6 +507,7 @@ const AppContent: React.FC = () => {
     } else {
       setRecords(prev => prev.filter(r => r.status === 'ACTIVE'));
     }
+    purgarRegistros(type).catch(err => console.error('[DB] Error al purgar:', err));
   };
 
   const handleDevLogin = (e: React.FormEvent) => {

@@ -1,15 +1,23 @@
 {
-  "name": "parking-core",
+  "name": "rossember-parking-lite",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "description": "Sistema de gestión de parqueadero Rossember Parking Lite",
+  "author": "Rossember",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "tsc && vite build --config vite.electron.config.ts && electron-builder",
+    "electron:preview": "electron ."
   },
   "dependencies": {
     "@google/genai": "^1.31.0",
+    "better-sqlite3": "^12.8.0",
+    "electron-store": "^11.0.2",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.564.0",
@@ -19,14 +27,59 @@
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.1",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
+    "concurrently": "^9.2.1",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.rossember.parking-lite",
+    "productName": "Rossember Parking Lite",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "database/migration.sql",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "database/migration.sql",
+        "to": "database/migration.sql"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rossember Parking"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/icon.png"
+    }
   }
 }
