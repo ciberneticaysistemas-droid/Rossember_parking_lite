@@ -12,7 +12,8 @@ const PARQUEADERO_ID = 'park-default-0001';
 function getDbPath() {
   // En desarrollo: junto al proyecto. En producción: carpeta userData del usuario.
   const { app } = require('electron');
-  if (!app.isPackaged) {
+  const isPackaged = !!(app && app.isPackaged);
+  if (!isPackaged) {
     return path.join(__dirname, '../../rossember_parking.db');
   }
   return path.join(app.getPath('userData'), 'rossember_parking.db');

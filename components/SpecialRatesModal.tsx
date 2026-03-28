@@ -19,9 +19,25 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
     const [newValue, setNewValue] = useState(0);
     const [newDescription, setNewDescription] = useState('');
     const [newExpiration, setNewExpiration] = useState('');
+    const [addError, setAddError] = useState<string | null>(null);
 
     const handleAdd = () => {
-        if (!newPlate) return;
+        setAddError(null);
+        if (!newPlate) {
+            setAddError('⚠️ La placa es obligatoria.');
+            return;
+        }
+
+        // Validate discount cap
+        const isDiscount = newType !== SpecialRateType.MONTHLY;
+        if (isDiscount && newValue > 100) {
+            setAddError('⚠️ El descuento no puede ser mayor al 100%. Un descuento mayor generaría un saldo negativo.');
+            return;
+        }
+        if (isDiscount && newValue < 0) {
+            setAddError('⚠️ El descuento no puede ser negativo.');
+            return;
+        }
 
         const newRate: SpecialRate = {
             id: crypto.randomUUID(),
@@ -40,6 +56,7 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
         setNewDescription('');
         setNewExpiration('');
         setNewValue(0);
+        setAddError(null);
     };
 
     const handleRemove = (id: string) => {
@@ -110,10 +127,19 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                                     <input
                                         type="number"
                                         value={newValue}
-                                        onChange={(e) => setNewValue(Number(e.target.value))}
+                                        onChange={(e) => { setNewValue(Number(e.target.value)); setAddError(null); }}
                                         placeholder="0"
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none"
+                                        min={newType !== SpecialRateType.MONTHLY ? 0 : undefined}
+                                        max={newType !== SpecialRateType.MONTHLY ? 100 : undefined}
+                                        className={`w-full bg-slate-900 border rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none ${
+                                            newType !== SpecialRateType.MONTHLY && newValue > 100
+                                                ? 'border-red-500'
+                                                : 'border-slate-700'
+                                        }`}
                                     />
+                                    {newType !== SpecialRateType.MONTHLY && (
+                                        <p className="text-[9px] text-slate-500 mt-1">Máximo 100%</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -139,6 +165,11 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                                     />
                                 </div>
                             </div>
+                            {addError && (
+                                <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-3 text-red-400 text-xs font-bold">
+                                    {addError}
+                                </div>
+                            )}
                             <button
                                 onClick={handleAdd}
                                 className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"

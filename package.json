@@ -10,9 +10,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:5173 && node start-electron.js\"",
     "electron:build": "tsc && vite build --config vite.electron.config.ts && electron-builder",
-    "electron:preview": "electron ."
+    "electron:preview": "node start-electron.js"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",
@@ -35,7 +35,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
     "concurrently": "^9.2.1",
-    "electron": "^41.0.2",
+    "electron": "^34.5.8",
     "electron-builder": "^26.8.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",

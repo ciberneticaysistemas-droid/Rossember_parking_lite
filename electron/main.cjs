@@ -5,7 +5,9 @@ const path = require('path');
 const { initDatabase } = require('./database/db.cjs');
 const { registerHandlers } = require('./database/handlers.cjs');
 
-const isDev = !app.isPackaged;
+// En desarrollo: electron lanza con un argumento script (process.defaultApp = true)
+// En producción (empaquetado): process.defaultApp es undefined/false
+const isDev = !!(process.defaultApp || /[\\/]electron[\\/]/.test(process.execPath));
 let mainWindow;
 
 function createWindow() {

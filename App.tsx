@@ -644,6 +644,7 @@ const AppContent: React.FC = () => {
               onDocumentConfigUpdate={setDocumentConfig}
               keyboardShortcuts={keyboardShortcuts}
               onKeyboardShortcutsUpdate={setKeyboardShortcuts}
+              adminPassword={ADMIN_CREDENTIALS.password}
             />
 
           </ProtectedRoute>
