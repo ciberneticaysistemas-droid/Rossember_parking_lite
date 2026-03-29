@@ -301,8 +301,8 @@ const AppContent: React.FC = () => {
     const originalCost = totalCost;
 
     if (isDisabled) {
-      const discountPercent = rates['DISABILITY_DISCOUNT_PERCENT'] || 50;
-      totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+      const discountPercent = Math.min(rates['DISABILITY_DISCOUNT_PERCENT'] || 50, 100); // máx. 100%
+      totalCost = Math.max(0, Math.ceil(totalCost * (1 - discountPercent / 100)));
     }
 
     // Apply special rates (overrides/stacks with disability)
@@ -317,8 +317,8 @@ const AppContent: React.FC = () => {
           totalCost = 0;
           specialRateLabel = 'Mensualidad Activa';
         } else {
-          const discountPercent = specialRate.value;
-          totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+          const discountPercent = Math.min(specialRate.value, 100); // máx. 100%
+          totalCost = Math.max(0, Math.ceil(totalCost * (1 - discountPercent / 100)));
           specialRateLabel = `${specialRate.type}: ${discountPercent}%`;
         }
       } else {
@@ -333,7 +333,7 @@ const AppContent: React.FC = () => {
     const ivaEnabled = rates['IVA_ENABLED'] === 1;
     const ivaRate = rates['IVA_RATE'] || 19;
     const ivaAmount = ivaEnabled ? Math.round(totalCost * ivaRate / 100) : 0;
-    const finalTotal = totalCost + ivaAmount;
+    const finalTotal = Math.max(0, totalCost + ivaAmount); // nunca negativo
 
     return {
       subtotal: totalCost,
