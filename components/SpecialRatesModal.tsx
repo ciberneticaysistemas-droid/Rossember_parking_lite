@@ -19,9 +19,25 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
     const [newValue, setNewValue] = useState(0);
     const [newDescription, setNewDescription] = useState('');
     const [newExpiration, setNewExpiration] = useState('');
+    const [addError, setAddError] = useState<string | null>(null);
 
     const handleAdd = () => {
-        if (!newPlate) return;
+        setAddError(null);
+        if (!newPlate) {
+            setAddError('⚠️ La placa es obligatoria.');
+            return;
+        }
+
+        // Validate discount cap
+        const isDiscount = newType !== SpecialRateType.MONTHLY;
+        if (isDiscount && newValue > 100) {
+            setAddError('⚠️ El descuento no puede ser mayor al 100%. Un descuento mayor generaría un saldo negativo.');
+            return;
+        }
+        if (isDiscount && newValue < 0) {
+            setAddError('⚠️ El descuento no puede ser negativo.');
+            return;
+        }
 
         // Validación: porcentajes deben estar entre 0 y 100
         const isPercentType = newType !== SpecialRateType.MONTHLY;
@@ -52,6 +68,7 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
         setNewDescription('');
         setNewExpiration('');
         setNewValue(0);
+        setAddError(null);
     };
 
     const handleRemove = (id: string) => {
@@ -125,6 +142,7 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                                         onChange={(e) => {
                                             const val = Number(e.target.value);
                                             const isPercent = newType !== SpecialRateType.MONTHLY;
+                                            setAddError(null);
                                             // Limitar automáticamente el rango
                                             if (val < 0) { setNewValue(0); return; }
                                             if (isPercent && val > 100) { setNewValue(100); return; }
@@ -164,6 +182,11 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                                     />
                                 </div>
                             </div>
+                            {addError && (
+                                <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-3 text-red-400 text-xs font-bold">
+                                    {addError}
+                                </div>
+                            )}
                             <button
                                 onClick={handleAdd}
                                 className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"

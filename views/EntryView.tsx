@@ -132,6 +132,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
     }, []);
 
     const plateInputRef = React.useRef<HTMLInputElement>(null);
+    const helmetDescriptionRef = React.useRef<HTMLInputElement>(null);
 
     // Keyboard Shortcuts
     const shortcuts = keyboardShortcuts || DEFAULT_SHORTCUTS;
@@ -142,6 +143,12 @@ export const EntryView: React.FC<EntryViewProps> = ({
       [shortcuts.toggleMoto]: () => setManualType(VehicleType.MOTORCYCLE),
       [shortcuts.toggleBike]: () => setManualType(VehicleType.BICYCLE),
       [shortcuts.toggleAccessibility]: () => setIsAccessibilityMode(prev => !prev),
+      'Alt+H': () => {
+        if (manualType === VehicleType.MOTORCYCLE) {
+          setLeavesHelmet(true);
+          setTimeout(() => helmetDescriptionRef.current?.focus(), 100);
+        }
+      },
     });
 
     // QR Ticket State
@@ -154,6 +161,16 @@ export const EntryView: React.FC<EntryViewProps> = ({
         entryTime: number;
         helmetLocation?: string;
     } | null>(null);
+
+    // Real-time special rate banner while typing plate
+    const plateSpecialRateInfo = React.useMemo(() => {
+        const plate = manualPlate.trim().toUpperCase();
+        if (plate.length < 5) return null;
+        const rate = specialRates.find(r => r.plate === plate && r.isActive);
+        if (!rate) return null;
+        const isExpired = rate.expirationDate && rate.expirationDate < Date.now();
+        return { rate, isExpired: !!isExpired };
+    }, [manualPlate, specialRates]);
 
     // Feedback State
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -573,7 +590,10 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                     <div className="bg-orange-600 p-2 rounded-lg">
                                                       <HardHat size={20} className="text-white" />
                                                     </div>
-                                                    <span className="font-bold text-gray-800">¿Deja Casco?</span>
+                                                    <div>
+                                                        <span className="font-bold text-gray-800">¿Deja Casco?</span>
+                                                        <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded border bg-orange-100 border-orange-200 text-orange-600 font-black">Alt+H</span>
+                                                    </div>
                                                 </div>
                                                 <button
                                                     onClick={() => setLeavesHelmet(!leavesHelmet)}
@@ -585,6 +605,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                             {leavesHelmet && (
                                                 <>
                                                     <input
+                                                        ref={helmetDescriptionRef}
                                                         type="text"
                                                         value={helmetDescription}
                                                         onChange={(e) => setHelmetDescription(e.target.value)}
@@ -605,6 +626,42 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Real-time special rate banner */}
+                                {plateSpecialRateInfo && (
+                                    <div className={`rounded-xl p-3 flex items-start gap-3 border-2 ${
+                                        plateSpecialRateInfo.isExpired
+                                            ? 'bg-red-50 border-red-300 text-red-700'
+                                            : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                    }`}>
+                                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                        <div>
+                                            {plateSpecialRateInfo.isExpired ? (
+                                                <>
+                                                    <p className="font-bold text-sm">⚠️ Mensualidad VENCIDA</p>
+                                                    <p className="text-xs opacity-80">
+                                                        Venció el {new Date(plateSpecialRateInfo.rate.expirationDate!).toLocaleDateString('es-CO')}. Se cobrará tarifa normal.
+                                                    </p>
+                                                </>
+                                            ) : plateSpecialRateInfo.rate.type === 'Mensualidad' ? (
+                                                <>
+                                                    <p className="font-bold text-sm">✅ Mensualidad Activa</p>
+                                                    <p className="text-xs opacity-80">
+                                                        ${plateSpecialRateInfo.rate.value.toLocaleString()} · {plateSpecialRateInfo.rate.description || 'Sin descripción'}
+                                                        {plateSpecialRateInfo.rate.expirationDate && (
+                                                            <> · Vence: {new Date(plateSpecialRateInfo.rate.expirationDate).toLocaleDateString('es-CO')}</>
+                                                        )}
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="font-bold text-sm">✅ Tarifa Especial: {plateSpecialRateInfo.rate.type}</p>
+                                                    <p className="text-xs opacity-80">Descuento: {plateSpecialRateInfo.rate.value}%</p>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button
                                     onClick={handleManualSubmit}

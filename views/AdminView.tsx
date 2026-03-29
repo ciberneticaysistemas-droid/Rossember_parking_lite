@@ -43,6 +43,7 @@ interface AdminViewProps {
     onDocumentConfigUpdate: (config: DocumentConfig) => void;
     keyboardShortcuts: KeyboardShortcutsConfig;
     onKeyboardShortcutsUpdate: (config: KeyboardShortcutsConfig) => void;
+    adminPassword?: string;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -69,7 +70,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     documentConfig,
     onDocumentConfigUpdate,
     keyboardShortcuts,
-    onKeyboardShortcutsUpdate
+    onKeyboardShortcutsUpdate,
+    adminPassword = 'admin123',
 }) => {
     const navigate = useNavigate();
     const [showDatabase, setShowDatabase] = useState(false);
@@ -87,6 +89,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [showDocumentSettings, setShowDocumentSettings] = useState(false);
     const [showKeyboardSettings, setShowKeyboardSettings] = useState(false);
     const [showHelmets, setShowHelmets] = useState(false);
+    const [showHelmetTooltip, setShowHelmetTooltip] = useState(false);
+    
+    // Special rates auth
+    const [showSpecialRatesAuth, setShowSpecialRatesAuth] = useState(false);
+    const [specialRatesAuthInput, setSpecialRatesAuthInput] = useState('');
+    const [specialRatesAuthError, setSpecialRatesAuthError] = useState(false);
     
     // Reprint State
     const [reprintRecord, setReprintRecord] = useState<ParkingRecord | null>(null);
@@ -409,16 +417,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Configurar el logo de la empresa y opciones de marca blanca.</p>
                     </button>
 
-                    {/* 6. Tarifas Especiales */}
+                    {/* 6. Tarifas Especiales — Protegidas por clave */}
                     <button
-                        onClick={() => setShowSpecialRates(true)}
+                        onClick={() => {
+                            setSpecialRatesAuthInput('');
+                            setSpecialRatesAuthError(false);
+                            setShowSpecialRatesAuth(true);
+                        }}
                         className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
                     >
                         <div className="flex items-center gap-4 mb-4">
                             <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
                                 <Users size={24} className="text-orange-600" />
                             </div>
-                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tarifas Especiales</h3>
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tarifas Especiales</h3>
+                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-widest">🔒 Requiere clave</span>
+                            </div>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Gestionar mensualidades, descuentos para empleados y convenios especiales por placa.</p>
                     </button>
@@ -507,28 +522,59 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Personalizar las teclas de acceso rápido para Entrada y Salida (F2-F10 por defecto). No interfieren con la escritura.</p>
                     </button>
 
-                    {/* 14. Gestión de Cascos */}
-                    <button
-                        onClick={() => setShowHelmets(true)}
-                        className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                    {/* 14. Gestión de Cascos — con tooltip en hover */}
+                    <div
+                        className="relative"
+                        onMouseEnter={() => setShowHelmetTooltip(true)}
+                        onMouseLeave={() => setShowHelmetTooltip(false)}
                     >
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
-                                <HardHat size={24} className="text-orange-600" />
-                            </div>
-                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Cascos en Custodia</h3>
-                        </div>
-                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Ver qué motos dejaron casco, con su descripción. Útil para el operario de turno.</p>
-                        {(() => {
-                            const helmetCount = records.filter(r => r.vehicleType === 'Moto' && r.leavesHelmet && r.status === 'ACTIVE').length;
-                            return helmetCount > 0 ? (
-                                <div className="mt-2 flex items-center gap-2 text-orange-600 text-xs font-black">
-                                    <span className="bg-orange-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black">{helmetCount}</span>
-                                    casco{helmetCount !== 1 ? 's' : ''} activo{helmetCount !== 1 ? 's' : ''}
+                        <button
+                            onClick={() => setShowHelmets(true)}
+                            className="w-full bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg"
+                        >
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg">
+                                    <HardHat size={24} className="text-orange-600" />
                                 </div>
-                            ) : null;
-                        })()}
-                    </button>
+                                <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Cascos en Custodia</h3>
+                            </div>
+                            <p className="text-gray-500 text-sm leading-relaxed font-medium">Ver qué motos dejaron casco, con su descripción. Útil para el operario de turno.</p>
+                            {(() => {
+                                const helmetCount = records.filter(r => r.vehicleType === 'Moto' && r.leavesHelmet && r.status === 'ACTIVE').length;
+                                return helmetCount > 0 ? (
+                                    <div className="mt-2 flex items-center gap-2 text-orange-600 text-xs font-black">
+                                        <span className="bg-orange-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black">{helmetCount}</span>
+                                        casco{helmetCount !== 1 ? 's' : ''} activo{helmetCount !== 1 ? 's' : ''}
+                                    </div>
+                                ) : null;
+                            })()}
+                        </button>
+
+                        {/* Helmet Tooltip */}
+                        {showHelmetTooltip && (
+                            <div className="absolute bottom-full left-0 mb-2 w-72 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl z-50 p-4 pointer-events-none">
+                                <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                                    <HardHat size={12} /> Cascos Activos en Custodia
+                                </p>
+                                {(() => {
+                                    const activeHelmets = records.filter(r => r.status === 'ACTIVE' && r.leavesHelmet && r.vehicleType === 'Moto');
+                                    if (activeHelmets.length === 0) {
+                                        return <p className="text-slate-500 text-xs">Sin cascos en custodia ahora.</p>;
+                                    }
+                                    return (
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {activeHelmets.map(r => (
+                                                <div key={r.id} className="flex items-center justify-between bg-slate-800 rounded-xl px-3 py-2">
+                                                    <span className="text-white font-black text-sm tracking-widest">{r.plate}</span>
+                                                    <span className="text-orange-400 text-xs font-bold">{r.helmetLocation || 'Sin ubicación'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                    </div>
 
 
                     {/* 10. Centro de Mantenimiento */}
@@ -708,6 +754,67 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     }}
                     onClose={() => setShowPersonalization(false)}
                 />
+            )}
+
+            {/* Special Rates Auth Modal */}
+            {showSpecialRatesAuth && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-8">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Lock size={32} className="text-amber-400" />
+                            </div>
+                            <h3 className="text-xl font-black text-white">Acceso Restringido</h3>
+                            <p className="text-slate-400 text-sm mt-1">Ingrese la contraseña de administrador para continuar</p>
+                        </div>
+                        <input
+                            type="password"
+                            value={specialRatesAuthInput}
+                            onChange={e => { setSpecialRatesAuthInput(e.target.value); setSpecialRatesAuthError(false); }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    if (specialRatesAuthInput === adminPassword) {
+                                        setShowSpecialRatesAuth(false);
+                                        setShowSpecialRates(true);
+                                    } else {
+                                        setSpecialRatesAuthError(true);
+                                    }
+                                } else if (e.key === 'Escape') {
+                                    setShowSpecialRatesAuth(false);
+                                }
+                            }}
+                            placeholder="Contraseña de administrador"
+                            autoFocus
+                            className={`w-full bg-slate-800 border-2 rounded-xl px-4 py-3 text-white text-center mb-3 focus:outline-none transition-colors ${
+                                specialRatesAuthError ? 'border-red-500' : 'border-slate-700 focus:border-yellow-500'
+                            }`}
+                        />
+                        {specialRatesAuthError && (
+                            <p className="text-red-400 text-xs text-center mb-3 font-bold">⚠️ Contraseña incorrecta</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowSpecialRatesAuth(false)}
+                                className="flex-1 py-3 text-slate-400 font-bold hover:text-white transition-colors rounded-xl"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (specialRatesAuthInput === adminPassword) {
+                                        setShowSpecialRatesAuth(false);
+                                        setShowSpecialRates(true);
+                                    } else {
+                                        setSpecialRatesAuthError(true);
+                                    }
+                                }}
+                                className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Ingresar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showSpecialRates && (
