@@ -105,89 +105,91 @@ export const ExitView: React.FC<ExitViewProps> = ({
   const handleQRResult = (rawData: string) => {
     setScanning(false);
     setErrorMsg(null);
+    setSearchValue(''); // LIMPIEZA CRÍTICA: Borra cualquier código viejo o tecleado manualmente
     
     let data = rawData.trim();
     console.log('[Scanner] Raw Data:', data);
 
-    // Heuristic: Fix common HID scanner "translation" errors (Spanish keyboard vs US Scanner)
-    // Common mappings: Ñ -> :, [ -> {, ] -> }, ' -> - or " Depending on context
+    // Heurística: corrige errores de traducción de teclado HID (español vs US)
     if (data.includes('Ñ') || data.includes('[') || data.includes(']') || data.includes("'")) {
-       let fixed = data
-         .replace(/Ñ/g, ':')
-         .replace(/\[/g, '{')
-         .replace(/\]/g, '|') // In simplified format PC1|ID, | often becomes ] 
-         .replace(/'/g, '-'); 
-       
-       console.log('[Scanner] Heuristic Fix applied:', fixed);
-       data = fixed;
+      data = data.replace(/Ñ/g, ':').replace(/\[/g, '{').replace(/\]/g, '|').replace(/'/g, '-');
+      console.log('[Scanner] Heuristic Fix applied:', data);
     }
-    
-    let recordId = '';
 
-    // Intentamos detectar el nuevo formato simplificado PC1|ID o PP1|ID o PQ1|ID
-    // Also handle mangled versions like PC1]ID
+    // ── 1. Formato barcode corto: PB1|{8 hex} ────────────────────────────────
+    const barcodeMatch = data.match(/PB1[|\]]([a-f0-9]{8})/i);
+    if (barcodeMatch) {
+      const shortHex = barcodeMatch[1].toLowerCase();
+      const found = activeRecords.find(r => r.id.replace(/-/g, '').startsWith(shortHex));
+      if (found) {
+        setSelectedRecord(found);
+      } else {
+        const completed = records.find(r => r.id.replace(/-/g, '').startsWith(shortHex) && r.status === 'COMPLETED');
+        setErrorMsg(completed
+          ? "🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida."
+          : "⚠️ Código de barras no reconocido o vehículo no activo."
+        );
+      }
+      return;
+    }
+
+    // ── 2. Formato QR simplificado: PC1|UUID (o variantes PP1, PQ1) ──────────
+    let recordId = '';
     const simplifiedMatch = data.match(/P[CPQ]1[|\]](.+)/i);
     if (simplifiedMatch) {
       recordId = simplifiedMatch[1].replace(/'/g, '-');
     } else {
-      // Fallback para el formato JSON antiguo (compatibilidad con tiquetes ya impresos)
+      // ── 3. Fallback: JSON legacy (compatibilidad con tiquetes impresos antes) ─
       try {
-        // Simple regex extraction as a safe fallback for corrupted JSON
         const idMatch = data.match(/"id":"([^"]+)"/) || data.match(/id":"([^"]+)"/) || data.match(/id:([^,}\s]+)/);
         if (idMatch) {
-          recordId = idMatch[1].replace(/'/g, '-'); // Fix common UUID dash issue
+          recordId = idMatch[1].replace(/'/g, '-');
+        } else if (data.includes('POCHI')) {
+          const uuidFallback = data.match(/[a-f0-9]{8}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{12}/i);
+          if (uuidFallback) recordId = uuidFallback[0].replace(/'/g, '-');
         } else {
-          // If the string contains POCHI but JSON fails, it's likely a mangled JSON
-          if (data.includes('POCHI')) {
-             const uuidFallback = data.match(/[a-f0-9]{8}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{12}/i);
-             if (uuidFallback) recordId = uuidFallback[0].replace(/'/g, '-');
-          } else {
-             const parsed = JSON.parse(data);
-             if ((parsed.v === 'POCHI-PARK-V1' || parsed.v === 'PC-PARK-V1') && parsed.id) {
-               recordId = parsed.id;
-             }
+          const parsed = JSON.parse(data);
+          if ((parsed.v === 'POCHI-PARK-V1' || parsed.v === 'PC-PARK-V1') && parsed.id) {
+            recordId = parsed.id;
           }
         }
-      } catch (e) {
-        // Last resort: extract anything that looks like a UUID
+      } catch {
+        // ── 4. Último recurso: extraer cualquier UUID del string ──────────────
         const uuidMatch = data.match(/[a-f0-9]{8}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{4}[-'][a-f0-9]{12}/i);
         if (uuidMatch) recordId = uuidMatch[0].replace(/'/g, '-');
       }
     }
 
     if (recordId) {
-      const record = activeRecords.find(r => r.id === recordId);
+      const normalId = recordId.toLowerCase();
+      const record = activeRecords.find(r => r.id.toLowerCase() === normalId);
       if (record) {
         setSelectedRecord(record);
       } else {
-        const completed = records.find(r => r.id === recordId && r.status === 'COMPLETED');
-        if (completed) {
-          setErrorMsg("🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida.");
-        } else {
-          setErrorMsg(`⚠️ El vehículo con ID ${recordId.substring(0,8)}... no se encuentra activo.`);
-        }
+        const completed = records.find(r => r.id.toLowerCase() === normalId && r.status === 'COMPLETED');
+        setErrorMsg(completed
+          ? "🛑 ACCESO DENEGADO: Este tiquete YA FUE PROCESADO. El vehículo ya registró su salida."
+          : `⚠️ El vehículo con ID ${recordId.substring(0, 8)}... no se encuentra activo.`
+        );
       }
     } else {
-      // If it's not a recognized QR format, try to treat it as a plate number
-      // We clean the plate and check
+      // ── 5. Sin formato reconocido: intentar como placa ────────────────────
       const cleanPlate = data.replace(/[^A-Z0-9]/gi, '').toUpperCase();
       const record = activeRecords.find(r => r.plate.toUpperCase() === cleanPlate);
       if (record) {
         setSelectedRecord(record);
       } else {
-        setErrorMsg("⚠️ Código QR no reconocido o vehículo no encontrado.");
+        setErrorMsg("⚠️ Código no reconocido o vehículo no encontrado.");
       }
     }
   };
 
   const handleSearch = () => {
     setErrorMsg(null);
-    const record = activeRecords.find(r => r.plate.toUpperCase() === searchValue.toUpperCase());
-    if (record) {
-      setSelectedRecord(record);
-    } else {
-      setErrorMsg("⚠️ No se encontró un vehículo activo con esa placa.");
-    }
+    const val = searchValue.trim();
+    if (!val) return;
+    // Siempre pasar por handleQRResult: maneja QR, barcode y placa como fallback
+    handleQRResult(val);
   };
 
   const currentCost = selectedRecord ? calculateCost(
@@ -238,7 +240,7 @@ export const ExitView: React.FC<ExitViewProps> = ({
     onProcessExit(recordId);
     setShowPaymentModal(false);
     setSelectedRecord(null);
-    setSearchValue('');
+    setSearchValue(''); // Asegura reset para el próximo escaneo
     
     // Auto-focus search for next exit
     setTimeout(() => {

@@ -12,67 +12,20 @@ import {
   cargarLicencia, guardarLicencia,
 } from './src/services/electronDB';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { DeviceSelector } from './components/DeviceSelector';
-import { EntryView } from './views/EntryView';
-import { ExitView } from './views/ExitView';
-import { AdminView } from './views/AdminView';
-import { AdminLogin } from './views/AdminLogin';
-import { HomeMenu } from './views/HomeMenu';
-import { AccessView } from './views/AccessView';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './types';
-import { LockScreen } from './components/LockScreen';
-import { DevConfigModal } from './components/DevConfigModal';
-import { ShieldAlert, Key } from 'lucide-react';
+import { DeviceSelector } from './src/components/DeviceSelector';
+import { EntryView } from './src/views/EntryView';
+import { ExitView } from './src/views/ExitView';
+import { AdminView } from './src/views/AdminView';
+import { AdminLogin } from './src/views/AdminLogin';
+import { HomeMenu } from './src/views/HomeMenu';
+import { AccessView } from './src/views/AccessView';
+import { ProtectedRoute } from './src/components/ProtectedRoute';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './src/types';
+import { LockScreen } from './src/components/LockScreen';
+import { DevConfigModal } from './src/components/DevConfigModal';
+import { DEFAULT_RATES, DEFAULT_FLOORS, DEFAULT_PREFIXES, DEFAULT_CAPACITIES, ADMIN_CREDENTIALS } from './src/config/defaults';
+import { ShieldAlert } from 'lucide-react';
 
-// Default Capacity Configuration
-const DEFAULT_CAPACITIES = {
-  REGULAR_CAR: 10,
-  PRIORITY_CAR: 5,
-  MOTO: 5,
-  EV_CHARGING: 5,
-  BICYCLE: 10
-};
-
-const DEFAULT_PREFIXES = {
-  REGULAR_CAR: 'C',
-  PRIORITY_CAR: 'P',
-  MOTO: 'M',
-  EV_CHARGING: 'E',
-  BICYCLE: 'B'
-};
-
-const DEFAULT_FLOORS: Floor[] = [
-  {
-    id: 'floor-1',
-    name: 'Piso 1',
-    capacities: DEFAULT_CAPACITIES,
-    prefixes: DEFAULT_PREFIXES
-  }
-];
-
-const DEFAULT_RATES = {
-  [VehicleType.CAR]: 85,
-  [VehicleType.MOTORCYCLE]: 55,
-  [VehicleType.BICYCLE]: 30,
-  [VehicleType.ELECTRIC]: 100,
-  [VehicleType.UNKNOWN]: 85,
-  'CAR_FULL': 35000,
-  'MOTO_FULL': 18000,
-  'BICYCLE_FULL': 8000,
-  'EV_CHARGING_RATE': 120,
-  'DISABILITY_DISCOUNT_PERCENT': 50,
-  'GRACE_PERIOD_MINUTES': 15,
-  'IVA_ENABLED': 0, // 0 = disabled, 1 = enabled
-  'IVA_RATE': 19
-};
-
-// Admin credentials - leídas desde variables de entorno (.env)
-// En GitHub Pages, configura estos valores como GitHub Secrets en el workflow de Actions
-const ADMIN_CREDENTIALS = {
-  username: import.meta.env.VITE_ADMIN_USERNAME || 'admin',
-  password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123'
-};
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
@@ -208,6 +161,47 @@ const AppContent: React.FC = () => {
     }
   }, [licenseConfig, dbReady]);
 
+  // ── Escuchador Global de Teclado (Hardware Scanner) ────────────────────
+  useEffect(() => {
+    if (!hardwareScannerConfig.enabled || !hardwareScannerConfig.captureGlobally) return;
+
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el foco está en un input (opcional, pero para "global" solemos querer capturarlo)
+      // Aunque si el usuario está escribiendo un nombre, no queremos que el escáner se meta.
+      // Pero los escáneres suelen ser rápidos.
+      
+      const currentTime = Date.now();
+      // Si pasa mucho tiempo entre teclas, el buffer se limpia (escritura humana es lenta)
+      if (currentTime - lastKeyTime > 200) {
+        buffer = '';
+      }
+      lastKeyTime = currentTime;
+
+      if (e.key === hardwareScannerConfig.suffix || e.key === 'Enter') {
+        if (buffer.length >= 3) {
+          console.log('[Global Scan] Detected:', buffer);
+          // Navegamos al módulo de acceso, pestaña SALIDA, pasando el dato
+          navigate('/acceso', { 
+            state: { 
+              externalScan: buffer, 
+              timestamp: Date.now(), 
+              forceTab: 'EXIT' 
+            } 
+          });
+        }
+        buffer = '';
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hardwareScannerConfig, navigate, dbReady]);
+
   // Periodic check for the "time bomb"
   useEffect(() => {
     if (!licenseConfig || !licenseConfig.isActive || !licenseConfig.expirationDate || isLocked) return;
@@ -301,8 +295,8 @@ const AppContent: React.FC = () => {
     const originalCost = totalCost;
 
     if (isDisabled) {
-      const discountPercent = rates['DISABILITY_DISCOUNT_PERCENT'] || 50;
-      totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+      const discountPercent = Math.min(rates['DISABILITY_DISCOUNT_PERCENT'] || 50, 100); // máx. 100%
+      totalCost = Math.max(0, Math.ceil(totalCost * (1 - discountPercent / 100)));
     }
 
     // Apply special rates (overrides/stacks with disability)
@@ -317,8 +311,8 @@ const AppContent: React.FC = () => {
           totalCost = 0;
           specialRateLabel = 'Mensualidad Activa';
         } else {
-          const discountPercent = specialRate.value;
-          totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+          const discountPercent = Math.min(specialRate.value, 100); // máx. 100%
+          totalCost = Math.max(0, Math.ceil(totalCost * (1 - discountPercent / 100)));
           specialRateLabel = `${specialRate.type}: ${discountPercent}%`;
         }
       } else {
@@ -333,7 +327,7 @@ const AppContent: React.FC = () => {
     const ivaEnabled = rates['IVA_ENABLED'] === 1;
     const ivaRate = rates['IVA_RATE'] || 19;
     const ivaAmount = ivaEnabled ? Math.round(totalCost * ivaRate / 100) : 0;
-    const finalTotal = totalCost + ivaAmount;
+    const finalTotal = Math.max(0, totalCost + ivaAmount); // nunca negativo
 
     return {
       subtotal: totalCost,

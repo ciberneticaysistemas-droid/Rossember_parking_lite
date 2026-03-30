@@ -21,6 +21,7 @@
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.564.0",
+    "jsbarcode": "^3.12.3",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
+    "@types/jsbarcode": "^3.11.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.1",
     "@types/react": "^18.2.64",

@@ -39,6 +39,18 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
             return;
         }
 
+        // Validación: porcentajes deben estar entre 0 y 100
+        const isPercentType = newType !== SpecialRateType.MONTHLY;
+        if (isPercentType && (newValue < 0 || newValue > 100)) {
+            alert('El porcentaje de descuento debe estar entre 0% y 100%.');
+            return;
+        }
+        // Validación: valores monetarios no pueden ser negativos
+        if (newValue < 0) {
+            alert('El valor no puede ser negativo.');
+            return;
+        }
+
         const newRate: SpecialRate = {
             id: crypto.randomUUID(),
             plate: newPlate.toUpperCase(),
@@ -122,23 +134,28 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block">
-                                        {newType === SpecialRateType.MONTHLY ? 'Valor Pagado ($)' : 'Valor (% Desc)'}
+                                        {newType === SpecialRateType.MONTHLY ? 'Valor Pagado ($)' : 'Descuento (% máx. 100)'}
                                     </label>
                                     <input
                                         type="number"
                                         value={newValue}
-                                        onChange={(e) => { setNewValue(Number(e.target.value)); setAddError(null); }}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            const isPercent = newType !== SpecialRateType.MONTHLY;
+                                            setAddError(null);
+                                            // Limitar automáticamente el rango
+                                            if (val < 0) { setNewValue(0); return; }
+                                            if (isPercent && val > 100) { setNewValue(100); return; }
+                                            setNewValue(val);
+                                        }}
                                         placeholder="0"
-                                        min={newType !== SpecialRateType.MONTHLY ? 0 : undefined}
+                                        min={0}
                                         max={newType !== SpecialRateType.MONTHLY ? 100 : undefined}
-                                        className={`w-full bg-slate-900 border rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none ${
-                                            newType !== SpecialRateType.MONTHLY && newValue > 100
-                                                ? 'border-red-500'
-                                                : 'border-slate-700'
-                                        }`}
+                                        step={newType !== SpecialRateType.MONTHLY ? 1 : 1000}
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none"
                                     />
                                     {newType !== SpecialRateType.MONTHLY && (
-                                        <p className="text-[9px] text-slate-500 mt-1">Máximo 100%</p>
+                                        <p className="text-[10px] text-slate-500 mt-1">Rango válido: 0% – 100%</p>
                                     )}
                                 </div>
                             </div>

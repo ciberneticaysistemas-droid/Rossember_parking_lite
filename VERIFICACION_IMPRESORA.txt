@@ -1,0 +1,55 @@
+================================================================================
+PASOS DE VERIFICACIÓN DE IMPRESIÓN - ROSSEMBER PARKING LITE
+================================================================================
+
+Sigue estos pasos uno por uno para encontrar exactamente DONDE está el fallo:
+
+PASO 1: VERIFICACIÓN DEL DRIVER (EL MÁS IMPORTANTE)
+--------------------------------------------------
+1. Ve a Panel de Control > Dispositivos e Impresoras.
+2. Click derecho en la impresora (ej. "XP-58") > Propiedades de la impresora.
+3. Haz clic en "Imprimir página de prueba".
+   - ¿Salió la hoja con texto de Windows?
+     [ ] SÍ (Pasa al Paso 2)
+     [ ] NO (El problema es el cable, el puerto USB o el driver. Revisa el puerto).
+
+PASO 2: NOMBRE E EXACTITUD
+--------------------------
+1. En esa misma ventana de Propiedades, asegúrate de que el NOMBRE de la
+   impresora sea exactamente "XP-58" (sin espacios adicionales).
+2. Asegúrate de que no haya otros trabajos pendientes en la cola.
+
+PASO 3: CONFIGURACIÓN EN LA APP
+-------------------------------
+1. Abre la App Rossember Parking Lite.
+2. Ve a Configuración > Impresora Técncia.
+3. Escribe el nombre: "XP-58" (debe coincidir con el nombre de Windows).
+4. Elige Ancho de Papel: "58".
+5. Guarda los cambios.
+
+PASO 4: PRUEBA DE COMUNICACIÓN (IPC)
+------------------------------------
+1. Intenta imprimir un tiquete de entrada desde la App.
+2. Mira la terminal o los logs de la App.
+   - ¿Aparece el botón "Imprimiendo..."?
+     [ ] SÍ
+     [ ] NO (Si no aparece, el problema es el código del frontend).
+
+PASO 5: VERIFICACIÓN FÍSICA
+---------------------------
+1. Al presionar imprimir:
+   - ¿La impresora hace un ruido o saca un poco de papel?
+     [ ] SÍ, pero vacío (El problema es el renderizado o los márgenes del driver).
+     [ ] NO hace nada (El problema es que la App no encuentra la impresora).
+
+PASO 6: LECTURA INFRARROJA
+--------------------------
+1. Si el tiquete sale impreso:
+2. Escanea el código con tu lector.
+   - ¿Lo lee al instante?
+     [ ] SÍ (¡Perfecto!)
+     [ ] NO (Hay que ajustar el contraste o el tamaño en el código).
+
+================================================================================
+SI FALLA EN ALGUNO DE ESTOS PASOS, DIME EL NÚMERO DEL PASO Y LO CORREGIMOS.
+================================================================================

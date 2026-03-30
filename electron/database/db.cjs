@@ -1,4 +1,16 @@
 'use strict';
+/**
+ * db.cjs  —  Inicialización y conexión SQLite (Electron / backend)
+ *
+ * Abre (o crea) la base de datos SQLite usando better-sqlite3.
+ * - Desarrollo: archivo junto al proyecto (rossember_parking.db)
+ * - Producción: carpeta userData del sistema operativo
+ *
+ * Ejecuta migration.sql en cada arranque (idempotente gracias a IF NOT EXISTS),
+ * activa claves foráneas y modo WAL para mejor rendimiento en lectura concurrente.
+ *
+ * Exporta: initDatabase(), getDatabase(), getParqueaderoId()
+ */
 
 const Database = require('better-sqlite3');
 const path = require('path');

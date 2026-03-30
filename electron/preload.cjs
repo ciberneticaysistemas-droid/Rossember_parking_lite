@@ -1,12 +1,28 @@
 'use strict';
+/**
+ * preload.cjs  —  Bridge seguro entre Electron y React
+ *
+ * Usa contextBridge para exponer window.electronAPI al renderer con
+ * contextIsolation habilitado (nodeIntegration = false).
+ * El renderer NUNCA accede directamente a Node.js; todo pasa por este puente.
+ *
+ * Estructura del API expuesto:
+ *   window.electronAPI.registros.*        → CRUD de registros de vehículos
+ *   window.electronAPI.tarifas.*          → Configuración de precios
+ *   window.electronAPI.pisos.*            → Pisos y capacidades
+ *   window.electronAPI.tarifasEspeciales.*→ Mensualidades y descuentos
+ *   window.electronAPI.vetados.*          → Lista negra de vehículos
+ *   window.electronAPI.config.*           → Documentos, impresora, escáner, atajos, licencia
+ */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expone una API segura al contexto del navegador (React).
-// La app React la usa como: window.electronAPI.registros.todos()
-
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  print:      (html, options) => ipcRenderer.invoke('app:print',      { html, ...options }),
+  printToPDF: (html, options) => ipcRenderer.invoke('app:printToPDF', { html, ...options }),
+  getPrinters: () => ipcRenderer.invoke('app:getPrinters'),
+  getSerialPorts: () => ipcRenderer.invoke('app:getSerialPorts'),
 
   // ── Registros Vehiculos ────────────────────────────────────────────────
   registros: {
@@ -50,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     impresora: {
       obtener: () => ipcRenderer.invoke('db:configImpresora:obtener'),
       actualizar: (c) => ipcRenderer.invoke('db:configImpresora:actualizar', c),
+      print: (html, options) => ipcRenderer.invoke('app:print', { html, ...options }),
     },
     escaner: {
       obtener: () => ipcRenderer.invoke('db:configEscaner:obtener'),

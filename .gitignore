@@ -18,6 +18,11 @@ dist-ssr
 .env.production
 .env.development
 
+# Base de datos SQLite local (artefacto de desarrollo, puede contener datos reales)
+*.db
+*.db-shm
+*.db-wal
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

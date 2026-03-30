@@ -3,7 +3,7 @@ import { EntryView } from './EntryView';
 import { ExitView } from './ExitView';
 import { ParkingRecord, VehicleType, SpecialRate, Floor, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS } from '../types';
 import { ArrowLeft, LogIn, LogOut, Clock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 interface AccessViewProps {
@@ -69,44 +69,22 @@ export const AccessView: React.FC<AccessViewProps> = (props) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Global Hardware Scanner Listener
+  // Sync with Global Scanner data from state
+  const location = useLocation();
   useEffect(() => {
-    if (!props.hardwareScannerConfig?.enabled || !props.hardwareScannerConfig?.captureGlobally) return;
-
-    let buffer = '';
-    let lastKeyTime = Date.now();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-          // If we are strictly capturing globally, we might want to prevent default 
-          // but that's risky if the user IS manually typing.
-      }
-
-      const currentTime = Date.now();
+    const state = location.state as any;
+    if (state?.externalScan) {
+      console.log('[AccessView] Context scan received:', state.externalScan);
+      setExternalScanData(state.externalScan);
+      setActiveTab('EXIT');
       
-      if (currentTime - lastKeyTime > 200) {
-        buffer = '';
-      }
-      lastKeyTime = currentTime;
-
-      if (e.key === props.hardwareScannerConfig.suffix || e.key === 'Enter') {
-        if (buffer.length > 2) { 
-          console.log('[Hardware Scanner] Scanned:', buffer);
-          setExternalScanData(buffer);
-          setActiveTab('EXIT'); 
-          
-          setTimeout(() => setExternalScanData(null), 100);
-        }
-        buffer = '';
-      } else if (e.key.length === 1) {
-        buffer += e.key;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [props.hardwareScannerConfig, activeTab]);
+      // Limpiar el dato del historial de navegación para evitar re-disparos al navegar atrás/adelante
+      window.history.replaceState({}, document.title);
+      
+      // Resetear el dato externo después de un breve delay
+      setTimeout(() => setExternalScanData(null), 100);
+    }
+  }, [location.state]);
 
   // Keyboard Shortcuts for Tabs
   const shortcuts = props.keyboardShortcuts || DEFAULT_SHORTCUTS;

@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS registros_vehiculos (
     descripcion_casco           TEXT,   -- 'Casco negro AGV talla M'
 
     -- Cobro
-    costo_total                 REAL,   -- Valor final (con IVA si aplica)
-    costo_sin_descuento         REAL,   -- Antes del descuento (para mostrar diferencia)
+    costo_total                 REAL    CHECK (costo_total IS NULL OR costo_total >= 0),
+    costo_sin_descuento         REAL    CHECK (costo_sin_descuento IS NULL OR costo_sin_descuento >= 0),
     valor_iva                   REAL    DEFAULT 0,
     -- Valores: 'PENDIENTE' | 'PAGADO' | 'ANULADO_ADMIN'
     estado_pago                 TEXT,

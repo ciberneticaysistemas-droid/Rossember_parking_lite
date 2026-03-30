@@ -1,4 +1,16 @@
 'use strict';
+/**
+ * handlers.cjs  —  Capa de acceso a datos (Electron / backend)
+ *
+ * Registra todos los handlers IPC que responden a las llamadas de la app React.
+ * Cada handler recibe datos del renderer, ejecuta una operación SQLite (via db.cjs)
+ * y devuelve el resultado serializado al renderer.
+ *
+ * Conversores internos (rowToRecord, rowToRates, etc.) mapean los nombres de
+ * columna en español de la BD al formato JS en inglés definido en src/types.ts.
+ *
+ * Expuesto al renderer a través de: electron/preload.cjs → window.electronAPI
+ */
 
 const { randomUUID } = require('crypto');
 const { getDatabase, getParqueaderoId } = require('./db.cjs');
