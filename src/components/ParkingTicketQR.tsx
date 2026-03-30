@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Printer, X, CheckCircle, User, Clock, Building2 } from 'lucide-react';
 import { DocumentConfig, KeyboardShortcutsConfig } from '../types';
+import { BarcodeDisplay, BarcodeDisplayHandle } from './BarcodeDisplay';
 
 interface ParkingTicketQRProps {
   recordId: string;
@@ -11,7 +12,7 @@ interface ParkingTicketQRProps {
   spotNumber: string;
   entryTime: number;
   onClose: () => void;
-  printerConfig?: { name: string; connected: boolean; autoprint?: boolean; paperFormat?: string; paperWidth?: number } | null;
+  printerConfig?: { name: string; connected: boolean; autoprint?: boolean; paperFormat?: string; paperWidth?: number; ticketCodeType?: 'QR' | 'BARCODE' } | null;
   documentConfig?: DocumentConfig;
   keyboardShortcuts?: KeyboardShortcutsConfig;
   helmetLocation?: string;
@@ -33,26 +34,39 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
   helmetLocation
 }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<BarcodeDisplayHandle>(null);
 
-  // Datos del QR simplificados para que los puntos sean más grandes y fáciles de leer
-  const qrData = `PC1|${recordId}`;
+  const useBarcode = printerConfig?.ticketCodeType === 'BARCODE';
+
+  // QR:      payload completo — escáneres de cámara manejan strings largos sin problema
+  // Barcode: payload corto   — los primeros 8 hex del UUID son suficientes para identificar
+  //          el registro en un parqueadero activo (colisión: 1 en 4 mil millones)
+  const ticketData = useBarcode
+    ? `PB1|${recordId.replace(/-/g, '').substring(0, 8)}`  // 12 chars → ~52mm en papel 80mm
+    : `PC1|${recordId}`;
 
   const handlePrint = () => {
     if (!ticketRef.current) return;
 
-    // Determine paper width based on printer format
     const fmt = printerConfig?.paperFormat;
+    const isThermal = fmt === 'TICKET' || fmt === 'TICKET_WIDE' || !fmt;
+
     let cssMaxWidth = '310px';
     let bodyPadding = '16px';
-    if (fmt === 'TICKET') { cssMaxWidth = '220px'; bodyPadding = '10px'; }
-    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '300px'; bodyPadding = '14px'; }
+    if (fmt === 'TICKET') { cssMaxWidth = '302px'; bodyPadding = '8px'; }
+    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '302px'; bodyPadding = '8px'; }
     else if (fmt === 'HALF') { cssMaxWidth = '390px'; bodyPadding = '20px'; }
     else if (fmt === 'LETTER') { cssMaxWidth = '740px'; bodyPadding = '30px'; }
 
-    // Get the SVG element and its outerHTML - specifically the QR one
-    const qrContainer = ticketRef.current.querySelector('.qr-code-container');
-    const svgElement = qrContainer ? qrContainer.querySelector('svg') : null;
-    const svgHTML = svgElement ? svgElement.outerHTML : '';
+    // Obtener el SVG del código (QR o Barcode) para incrustarlo en el HTML impreso
+    let codeHTML = '';
+    if (useBarcode) {
+      codeHTML = barcodeRef.current?.getSvgHtml() ?? '';
+    } else {
+      const qrContainer = ticketRef.current.querySelector('.qr-code-container');
+      const svgElement = qrContainer ? qrContainer.querySelector('svg') : null;
+      codeHTML = svgElement ? svgElement.outerHTML : '';
+    }
 
     const content = `
       <!DOCTYPE html>
@@ -68,31 +82,36 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
               padding: ${bodyPadding};
               max-width: ${cssMaxWidth};
               margin: 0 auto;
+              font-size: ${isThermal ? '11px' : '13px'};
             }
             .ticket {
-              border: 2px dashed #9ca3af;
-              border-radius: 16px;
-              padding: 24px;
+              ${isThermal ? 'border: 1px dashed #000;' : 'border: 2px dashed #9ca3af; border-radius: 16px;'}
+              padding: ${isThermal ? '10px' : '24px'};
               text-align: center;
               background: #fff;
             }
-            .logo-title { font-size: 24px; font-weight: 900; color: #111827; margin-bottom: 4px; }
-            .subtitle { font-size: 11px; color: #4b5563; letter-spacing: 0.1em; margin-bottom: 20px; font-weight: bold; }
-            .plate { font-size: 48px; font-weight: 900; letter-spacing: 0.05em; color: #ea580c; margin: 12px 0; font-family: monospace; line-height: 1; }
-            .info-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+            .logo-title { font-size: ${isThermal ? '14px' : '24px'}; font-weight: 900; color: #111827; margin-bottom: 2px; }
+            .subtitle { font-size: 9px; color: #4b5563; letter-spacing: 0.08em; margin-bottom: ${isThermal ? '8px' : '20px'}; font-weight: bold; text-transform: uppercase; }
+            .plate { font-size: ${isThermal ? '32px' : '48px'}; font-weight: 900; letter-spacing: 0.05em; color: #000; margin: ${isThermal ? '6px' : '12px'} 0; font-family: monospace; line-height: 1; }
+            .info-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '10px' : '13px'}; padding: ${isThermal ? '3px' : '6px'} 0; border-bottom: 1px solid #e5e7eb; }
             .info-label { color: #6b7280; font-weight: 500; }
             .info-value { font-weight: 800; color: #111827; }
-            .qr-wrap { display: flex; justify-content: center; margin: 24px 0; }
-            .qr-wrap svg { width: 180px; height: 180px; color: #000; }
-            .footer { font-size: 11px; color: #6b7280; margin-top: 16px; font-weight: 600; }
-            .hash { font-size: 8px; color: #9ca3af; margin-top: 8px; font-family: monospace; }
-            @media print { 
-              body { margin: 0; padding: 10px; }
-              .ticket { border: 2px dashed #000; }
+            .code-wrap { display: flex; justify-content: center; margin: ${isThermal ? '10px' : '24px'} 0; }
+            .code-wrap svg { ${useBarcode
+              ? `width: 100%; max-width: ${isThermal ? '220px' : '260px'}; height: auto;`
+              : `width: ${isThermal ? '140px' : '180px'}; height: ${isThermal ? '140px' : '180px'};`
+            } }
+            .footer { font-size: 9px; color: #6b7280; margin-top: ${isThermal ? '8px' : '16px'}; font-weight: 600; line-height: 1.4; }
+            .hash { font-size: 7px; color: #9ca3af; margin-top: 6px; font-family: monospace; }
+
+            ${isThermal ? `@page { size: 80mm auto; margin: 2mm 4mm; }` : `@page { margin: 10mm; }`}
+            @media print {
+              body { padding: 0; ${isThermal ? 'width: 72mm; font-size: 10px;' : ''} }
+              .ticket { border: 1px dashed #000; border-radius: 0; }
             }
           </style>
         </head>
-        <body onload="window.print();">
+        <body>
           <div class="ticket">
             <div class="logo-title">🅿 ${documentConfig?.businessName || 'ParkingCore'}</div>
             <div class="subtitle">TIQUETE DE ESTACIONAMIENTO</div>
@@ -107,8 +126,8 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             <div class="info-row"><span class="info-label">Fecha</span><span class="info-value">${new Date(entryTime).toLocaleDateString('es-CO')}</span></div>
             ${helmetLocation ? `<div class="info-row" style="background: #fff7ed; padding: 10px; border: 1px solid #fdba74; border-radius: 8px; margin-top: 10px;"><span class="info-label" style="color: #c2410c;">UBICACIÓN CASCO</span><span class="info-value" style="color: #9a3412; font-size: 18px;">${helmetLocation}</span></div>` : ''}
             
-            <div class="qr-wrap">
-              ${svgHTML}
+            <div class="code-wrap">
+              ${codeHTML}
             </div>
             
             <div class="footer">${documentConfig?.ticketFooter || 'Conserve este tiquete.<br>Se requiere para registrar la salida.'}</div>
@@ -225,16 +244,27 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
             )}
           </div>
 
-          {/* QR Code */}
+          {/* QR / Barcode */}
           <div className="qr-code-container flex flex-col items-center gap-2 p-2 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-            <QRCodeSVG
-              value={qrData}
-              size={180}
-              level="H"
-              includeMargin={true}
-              className="rounded-lg"
-            />
-            <p className="text-[10px] font-bold text-gray-400 text-center uppercase tracking-widest">Escanee para salir</p>
+            {useBarcode ? (
+              <BarcodeDisplay
+                ref={barcodeRef}
+                value={ticketData}
+                barHeight={60}
+                displayValue={false}
+              />
+            ) : (
+              <QRCodeSVG
+                value={ticketData}
+                size={180}
+                level="H"
+                includeMargin={true}
+                className="rounded-lg"
+              />
+            )}
+            <p className="text-[10px] font-bold text-gray-400 text-center uppercase tracking-widest">
+              {useBarcode ? 'Código de Barras — Escanee para salir' : 'Escanee para salir'}
+            </p>
           </div>
         </div>
 

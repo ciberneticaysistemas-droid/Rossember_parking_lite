@@ -12,67 +12,20 @@ import {
   cargarLicencia, guardarLicencia,
 } from './src/services/electronDB';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { DeviceSelector } from './components/DeviceSelector';
-import { EntryView } from './views/EntryView';
-import { ExitView } from './views/ExitView';
-import { AdminView } from './views/AdminView';
-import { AdminLogin } from './views/AdminLogin';
-import { HomeMenu } from './views/HomeMenu';
-import { AccessView } from './views/AccessView';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './types';
-import { LockScreen } from './components/LockScreen';
-import { DevConfigModal } from './components/DevConfigModal';
-import { ShieldAlert, Key } from 'lucide-react';
+import { DeviceSelector } from './src/components/DeviceSelector';
+import { EntryView } from './src/views/EntryView';
+import { ExitView } from './src/views/ExitView';
+import { AdminView } from './src/views/AdminView';
+import { AdminLogin } from './src/views/AdminLogin';
+import { HomeMenu } from './src/views/HomeMenu';
+import { AccessView } from './src/views/AccessView';
+import { ProtectedRoute } from './src/components/ProtectedRoute';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './src/types';
+import { LockScreen } from './src/components/LockScreen';
+import { DevConfigModal } from './src/components/DevConfigModal';
+import { DEFAULT_RATES, DEFAULT_FLOORS, DEFAULT_PREFIXES, DEFAULT_CAPACITIES, ADMIN_CREDENTIALS } from './src/config/defaults';
+import { ShieldAlert } from 'lucide-react';
 
-// Default Capacity Configuration
-const DEFAULT_CAPACITIES = {
-  REGULAR_CAR: 10,
-  PRIORITY_CAR: 5,
-  MOTO: 5,
-  EV_CHARGING: 5,
-  BICYCLE: 10
-};
-
-const DEFAULT_PREFIXES = {
-  REGULAR_CAR: 'C',
-  PRIORITY_CAR: 'P',
-  MOTO: 'M',
-  EV_CHARGING: 'E',
-  BICYCLE: 'B'
-};
-
-const DEFAULT_FLOORS: Floor[] = [
-  {
-    id: 'floor-1',
-    name: 'Piso 1',
-    capacities: DEFAULT_CAPACITIES,
-    prefixes: DEFAULT_PREFIXES
-  }
-];
-
-const DEFAULT_RATES = {
-  [VehicleType.CAR]: 85,
-  [VehicleType.MOTORCYCLE]: 55,
-  [VehicleType.BICYCLE]: 30,
-  [VehicleType.ELECTRIC]: 100,
-  [VehicleType.UNKNOWN]: 85,
-  'CAR_FULL': 35000,
-  'MOTO_FULL': 18000,
-  'BICYCLE_FULL': 8000,
-  'EV_CHARGING_RATE': 120,
-  'DISABILITY_DISCOUNT_PERCENT': 50,
-  'GRACE_PERIOD_MINUTES': 15,
-  'IVA_ENABLED': 0, // 0 = disabled, 1 = enabled
-  'IVA_RATE': 19
-};
-
-// Admin credentials - leídas desde variables de entorno (.env)
-// En GitHub Pages, configura estos valores como GitHub Secrets en el workflow de Actions
-const ADMIN_CREDENTIALS = {
-  username: import.meta.env.VITE_ADMIN_USERNAME || 'admin',
-  password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123'
-};
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();

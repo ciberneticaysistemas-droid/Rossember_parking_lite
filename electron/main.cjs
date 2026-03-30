@@ -1,4 +1,15 @@
 'use strict';
+/**
+ * main.cjs  —  Proceso principal de Electron
+ *
+ * Punto de entrada de la aplicación de escritorio. Responsable de:
+ *  1. Inicializar la base de datos SQLite (db.cjs)
+ *  2. Registrar todos los handlers IPC (handlers.cjs)
+ *  3. Crear la ventana principal del navegador
+ *
+ * En desarrollo carga http://localhost:5173 (servidor Vite).
+ * En producción carga dist/index.html (build estático).
+ */
 
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');

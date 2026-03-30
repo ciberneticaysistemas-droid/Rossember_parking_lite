@@ -10,6 +10,8 @@ export interface PrinterConfig {
   paperFormat: 'TICKET' | 'HALF' | 'LETTER' | 'A4'; // paper format name
   connected: boolean;
   autoprint: boolean;
+  /** Tipo de código en el tiquete de entrada. Default: 'QR' */
+  ticketCodeType: 'QR' | 'BARCODE';
 }
 
 interface PrinterSettingsModalProps {
@@ -25,6 +27,7 @@ const DEFAULT_CONFIG: PrinterConfig = {
   paperFormat: 'TICKET',
   connected: false,
   autoprint: false,
+  ticketCodeType: 'QR',
 };
 
 // Paper format definitions
@@ -253,6 +256,40 @@ export const PrinterSettingsModal: React.FC<PrinterSettingsModalProps> = ({
             >
               <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${config.autoprint ? 'left-6' : 'left-0.5'}`}></div>
             </button>
+          </div>
+
+          {/* Ticket Code Type */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">
+              Tipo de Código en Tiquete
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: 'QR',      icon: '⬛', label: 'Código QR',      sublabel: 'Cámara / lector óptico' },
+                { id: 'BARCODE', icon: '▌▌▌', label: 'Código de Barras', sublabel: 'Lector láser / HID' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setConfig(c => ({ ...c, ticketCodeType: opt.id }))}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    config.ticketCodeType === opt.id
+                      ? 'bg-teal-900/40 border-teal-500 text-white'
+                      : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+                  }`}
+                >
+                  <span className="text-2xl leading-none">{opt.icon}</span>
+                  <div>
+                    <p className={`text-sm font-bold leading-tight ${config.ticketCodeType === opt.id ? 'text-teal-300' : 'text-slate-300'}`}>
+                      {opt.label}
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-tight">{opt.sublabel}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[10px] text-slate-500 px-1">
+              Ambos formatos codifican el mismo ID de registro. El lector de salida decodifica ambos sin cambios.
+            </p>
           </div>
 
           {/* Test Result */}

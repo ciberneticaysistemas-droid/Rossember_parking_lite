@@ -51,12 +51,14 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
     }).replace('COP', '$');
 
   const handlePrint = () => {
-    // Determine paper width based on printer format
     const fmt = printerConfig?.paperFormat;
+    const isThermal = fmt === 'TICKET' || fmt === 'TICKET_WIDE' || !fmt;
+
+    // Ancho de vista previa en pantalla (no afecta la impresión real)
     let cssMaxWidth = '380px';
     let bodyPadding = '20px';
-    if (fmt === 'TICKET') { cssMaxWidth = '220px'; bodyPadding = '10px'; }
-    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '300px'; bodyPadding = '14px'; }
+    if (fmt === 'TICKET') { cssMaxWidth = '302px'; bodyPadding = '8px'; }
+    else if (fmt === 'TICKET_WIDE') { cssMaxWidth = '302px'; bodyPadding = '8px'; }
     else if (fmt === 'HALF') { cssMaxWidth = '390px'; bodyPadding = '20px'; }
     else if (fmt === 'LETTER') { cssMaxWidth = '740px'; bodyPadding = '30px'; }
 
@@ -74,43 +76,46 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
               padding: ${bodyPadding};
               max-width: ${cssMaxWidth};
               margin: 0 auto;
-              font-size: 13px;
+              font-size: ${isThermal ? '11px' : '13px'};
               color: #111;
             }
             .ticket {
-              padding: 24px;
+              padding: ${isThermal ? '8px' : '16px'};
               text-align: center;
-              border: 1px solid #ddd;
-              border-radius: 8px;
+              ${isThermal ? '' : 'border: 1px solid #ddd; border-radius: 8px;'}
             }
-            .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .logo { font-size: 24px; font-weight: 900; margin-bottom: 4px; }
-            .legal-info { font-size: 10px; color: #555; margin-bottom: 5px; line-height: 1.3; }
-            
-            .invoice-title { font-size: 16px; font-weight: 800; text-transform: uppercase; margin: 15px 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; }
-            
-            .plate { font-size: 40px; font-weight: 900; letter-spacing: 0.1em; color: #000; margin: 10px 0; font-family: monospace; }
-            
-            .details { margin: 20px 0; text-align: left; }
-            .detail-row { display: flex; justify-content: space-between; padding: 3px 0; }
+            .header { margin-bottom: ${isThermal ? '6px' : '12px'}; border-bottom: 2px solid #000; padding-bottom: ${isThermal ? '6px' : '10px'}; }
+            .logo { font-size: ${isThermal ? '14px' : '24px'}; font-weight: 900; margin-bottom: 2px; }
+            .legal-info { font-size: 9px; color: #555; margin-bottom: 3px; line-height: 1.3; }
+
+            .invoice-title { font-size: ${isThermal ? '12px' : '16px'}; font-weight: 800; text-transform: uppercase; margin: ${isThermal ? '6px' : '10px'} 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 4px 0; }
+
+            .plate { font-size: ${isThermal ? '28px' : '40px'}; font-weight: 900; letter-spacing: 0.1em; color: #000; margin: ${isThermal ? '5px' : '8px'} 0; font-family: monospace; }
+
+            .details { margin: ${isThermal ? '6px' : '12px'} 0; text-align: left; }
+            .detail-row { display: flex; justify-content: space-between; padding: ${isThermal ? '2px' : '3px'} 0; }
             .label { font-weight: 500; color: #444; }
             .value { font-weight: 700; }
-            
-            .totals { margin: 20px 0; padding-top: 10px; border-top: 2px solid #000; }
-            .total-row { display: flex; justify-content: space-between; padding: 4px 0; }
-            .grand-total { font-size: 20px; font-weight: 900; border-top: 1px solid #000; margin-top: 5px; padding-top: 5px; }
 
-            .cash-info { margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px; }
+            .totals { margin: ${isThermal ? '6px' : '12px'} 0; padding-top: ${isThermal ? '6px' : '10px'}; border-top: 2px solid #000; }
+            .total-row { display: flex; justify-content: space-between; padding: ${isThermal ? '2px' : '4px'} 0; }
+            .grand-total { border-top: 1px solid #000; margin-top: 4px; padding-top: 6px; display: block; text-align: center; }
+            .grand-total-label { font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.08em; }
+            .grand-total-value { font-size: ${isThermal ? '18px' : '22px'}; font-weight: 900; color: #000; margin-top: 2px; }
 
-            .footer { font-size: 10px; color: #777; margin-top: 30px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
-            
-            @media print { 
-              body { padding: 0; }
-              .ticket { border: none; }
+            .cash-info { margin-top: 4px; padding: ${isThermal ? '4px' : '8px'}; background: #f9f9f9; }
+
+            .footer { font-size: 9px; color: #777; margin-top: ${isThermal ? '8px' : '15px'}; line-height: 1.4; border-top: 1px solid #eee; padding-top: 8px; }
+
+            ${isThermal ? `@page { size: 80mm auto; margin: 2mm 4mm; }` : `@page { margin: 10mm; }`}
+            @media print {
+              body { padding: 0; ${isThermal ? 'width: 72mm; font-size: 10px;' : ''} }
+              .ticket { border: none; border-radius: 0; }
+              .cash-info { background: none; }
             }
           </style>
         </head>
-        <body onload="window.print();">
+        <body>
           <div class="ticket">
             <div class="header">
               <div class="logo">🅿 ${documentConfig?.businessName || 'ParkingCore'}</div>
@@ -128,7 +133,7 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
               <div class="detail-row"><span class="label">Fecha:</span><span class="value">${new Date(record.exitTime).toLocaleDateString('es-CO')}</span></div>
               <div class="detail-row"><span class="label">Entrada:</span><span class="value">${new Date(record.entryTime).toLocaleTimeString('es-CO')}</span></div>
               <div class="detail-row"><span class="label">Salida:</span><span class="value">${new Date(record.exitTime).toLocaleTimeString('es-CO')}</span></div>
-              <div className="detail-row"><span class="label">Tipo:</span><span class="value">${record.vehicleType}</span></div>
+              <div class="detail-row"><span class="label">Tipo:</span><span class="value">${record.vehicleType}</span></div>
               ${record.ownerId ? `<div class="detail-row"><span class="label">Cédula:</span><span class="value">${record.ownerId}</span></div>` : ''}
               ${record.leavesHelmet ? `<div class="detail-row" style="margin-top: 5px; color: #c2410c;"><span class="label">Casco:</span><span class="value">ENTREGADO (${record.helmetLocation || 'S/E'})</span></div>` : ''}
               <div class="detail-row"><span class="label">Método:</span><span class="value">${paymentMethod}</span></div>
@@ -137,7 +142,10 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
             <div class="totals">
               <div class="total-row"><span class="label">Subtotal:</span><span class="value">${formatCOP(subtotal)}</span></div>
               <div class="total-row"><span class="label">IVA (${ivaRate}%):</span><span class="value">${formatCOP(ivaAmount)}</span></div>
-              <div class="total-row grand-total"><span class="label">TOTAL PAGADO:</span><span class="value">${formatCOP(cost)}</span></div>
+              <div class="grand-total">
+                <div class="grand-total-label">Total Pagado</div>
+                <div class="grand-total-value">${formatCOP(cost)}</div>
+              </div>
             </div>
 
             ${cashGiven ? `
@@ -149,7 +157,6 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
 
             <div class="footer">
               <p>${documentConfig?.invoiceFooter || 'Gracias por su visita al Parqueadero.'}</p>
-              <p>Este documento es equivalente a factura.</p>
               <p>Vigile sus objetos personales.</p>
             </div>
           </div>
