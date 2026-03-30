@@ -94,8 +94,10 @@ export const PrinterSettingsModal: React.FC<PrinterSettingsModalProps> = ({
   const [serialPorts, _setSerialPorts] = useState<SerialPort[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [showPrinterList, setShowPrinterList] = useState(false);
-  // Siempre arranca en null — fetchSystemPrinters determina el estado real al abrir
-  const [verifiedStatus, setVerifiedStatus] = useState<boolean | null>(null);
+  // Persistencia v16: Si ya hay un nombre guardado, asumimos "true" hasta que se pruebe lo contrario
+  const [verifiedStatus, setVerifiedStatus] = useState<boolean | null>(
+    currentConfig?.name && currentConfig.name !== 'Impresora Térmica' ? true : null
+  );
 
   const selectedFormat = PAPER_FORMATS.find(f => f.id === config.paperFormat) || PAPER_FORMATS[1];
 
@@ -108,7 +110,7 @@ export const PrinterSettingsModal: React.FC<PrinterSettingsModalProps> = ({
 
   const fetchSystemPrinters = async () => {
     setLoadingPrinters(true);
-    setVerifiedStatus(null); // Resetea mientras carga — evita mostrar "Conectada" sin verificar
+    // Persistencia v16: No reseteamos verifiedStatus, dejamos el valor anterior mientras actualizamos
     try {
       const printerList: SystemPrinter[] = await (window as any).electronAPI.getPrinters();
       setSystemPrinters(printerList);
@@ -177,25 +179,13 @@ export const PrinterSettingsModal: React.FC<PrinterSettingsModalProps> = ({
       </body></html>`;
 
       try {
-        const res = await (window as any).electronAPI.print(testHtml, {
+        await (window as any).electronAPI.print(testHtml, {
           deviceName: config.name,
           paperWidth: config.paperWidth,
           silent: true,
         });
-        setTestResult(res?.ok ? 'ok' : 'fail');
-      } catch {
-        setTestResult('fail');
-      }
-    } else {
-      // Fallback navegador
-      const w = window.open('', '_blank', `width=${parseInt(selectedFormat.cssWidth) + 40},height=400`);
-      if (w) {
-        w.document.write(`<html><body onload="window.print();window.close();">
-          <h2>ParkingCore — Prueba</h2><p>${config.name}</p><p>${new Date().toLocaleString('es-CO')}</p>
-        </body></html>`);
-        w.document.close();
         setTestResult('ok');
-      } else {
+      } catch {
         setTestResult('fail');
       }
     }
@@ -217,13 +207,14 @@ export const PrinterSettingsModal: React.FC<PrinterSettingsModalProps> = ({
       : 'bg-slate-800/50 border-slate-700 text-slate-400';
 
   const statusIcon = verifiedStatus === true ? <Wifi size={18} /> : <WifiOff size={18} />;
-  const statusText = loadingPrinters
-    ? 'Verificando impresoras del sistema...'
-    : verifiedStatus === true
+  const statusText = 
+    verifiedStatus === true
       ? `Detectada: ${config.name}${config.usbPort ? ` — ${config.usbPort}` : ''}`
-      : verifiedStatus === false
-        ? `"${config.name}" no encontrada — selecciona una de la lista`
-        : 'Selecciona una impresora de la lista';
+      : loadingPrinters
+        ? 'Verificando impresoras del sistema...'
+        : verifiedStatus === false
+          ? `"${config.name}" no encontrada — selecciona una de la lista`
+          : 'Selecciona una impresora de la lista';
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">

@@ -74,39 +74,47 @@ export const ParkingTicketQR: React.FC<ParkingTicketQRProps> = ({
     <meta charset="utf-8">
     <title>Tiquete - ${plate}</title>
     <style>
-      /* Estilo v14: Retorno a la estabilidad */
       html, body {
         width: 100%;
+        height: auto !important;
         margin: 0; padding: 0;
         background: #fff; color: #000;
         font-size: ${infoFontPt}pt; line-height: 1.3;
+        overflow: hidden !important;
       }
 
       .ticket {
-        width: 280px; /* Ancho seguro para XP-58 */
-        margin: 0 auto;
-        padding: 4px;
-        text-align: center;
+        display: inline-block; /* Blindaje v20: evita rellenar toda la página */
+        width: 48mm; /* Área de impresión real solicitada (4.8cm) */
+        max-width: 48mm;
+        margin: 0 0 0 2mm; 
+        padding: 5px 0;
+        background: #fff;
+        text-align: left;
       }
 
-      .logo-title  { font-size: ${logoTitlePt}pt; font-weight: bold; margin-bottom: 2px; }
-      .subtitle    { font-size: ${subtitlePt}pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
-      .plate       { font-size: ${platePt}pt; font-weight: bold; margin: 4px 0; }
-      .vehicle-type{ font-size: ${infoFontPt}pt; font-weight: bold; }
-      .divider     { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+      .logo-title  { font-size: ${logoTitlePt}pt; font-weight: bold; margin-bottom: 2px; text-align: center; }
+      .subtitle    { font-size: ${subtitlePt}pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; text-align: center; }
+      .plate       { font-size: ${platePt}pt; font-weight: bold; margin: 4px 0; text-align: center; }
+      .vehicle-type{ font-size: ${infoFontPt}pt; font-weight: bold; text-align: center; }
+      .divider     { border: none; border-top: 1px dashed #000; margin: 4px 0; width: 100%; }
       .info-row    { display: flex; justify-content: space-between; font-size: ${infoFontPt}pt; padding: 2px 0; }
       .info-label  { font-weight: normal; }
       .info-value  { font-weight: bold; }
-      .code-wrap   { text-align: center; margin: 8px 0; }
-      .code-wrap svg { display: inline-block; width: 160px !important; height: auto !important; }
-      .footer      { font-size: ${footerPt}pt; font-weight: bold; margin-top: 4px; }
-      .hash        { font-size: 6pt; margin-top: 4px; opacity: 0.5; }
+      .code-wrap   { text-align: center; margin: 8px 0; width: 100%; }
+      .code-wrap svg { 
+        display: inline-block; 
+        width: 40mm !important; 
+        height: auto !important; 
+      }
+      .footer      { font-size: ${footerPt}pt; font-weight: bold; margin-top: 4px; text-align: center; }
+      .hash        { font-size: 6pt; margin-top: 4px; opacity: 0.5; text-align: center; }
 
       @page { size: auto; margin: 0mm; }
 
       @media print {
-        body { width: 280px !important; margin: 0 !important; padding: 0 !important; }
-        .ticket { width: 100% !important; padding: 4px 0 !important; }
+        body { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .ticket { width: ${paperWidth}mm !important; margin: 0 0 0 2mm !important; }
       }
     </style>
   </head>

@@ -15,6 +15,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { exec } = require('child_process');
 const { initDatabase } = require('./database/db.cjs');
 const { registerHandlers } = require('./database/handlers.cjs');
 
@@ -153,65 +154,78 @@ app.whenReady().then(() => {
       return { ok: false, error: 'Trabajo en curso' };
     }
 
-    printInProgress = true;
-    const pw = paperWidth || 80;
-    // Ventana estándar para tiquetes (300px es seguro para 58mm y 80mm)
-    const winW = 300;
+    // Fuerza Bruta v17: No hay bloqueo global, permitimos reintentos
+    printInProgress = false; 
 
-    console.log(`[Print] 🖨️  Restauración v14: Imprimiendo en "${deviceName || '(predeterminada)'}"`);
+    const pw = paperWidth || 80;
+    const winW = pw <= 65 ? 384 : pw <= 90 ? 576 : 800;
+
+    console.log(`[Print] 🚀 Fuerza Bruta v17: "${deviceName || '(default)'}"`);
 
     let workerWin = null;
 
     try {
+      // 1. Guardamos una copia temporal por si Electron falla (Bypass de Sistema)
+      const tmpDir = os.tmpdir();
+      const tmpPath = path.join(tmpDir, `ticket_${Date.now()}.html`);
+      fs.writeFileSync(tmpPath, html, 'utf-8');
+
       const dataUri = `data:text/html;base64,${Buffer.from(html).toString('base64')}`;
 
       workerWin = new BrowserWindow({
         show: false,
         width: winW,
         height: 600,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true
-        },
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
 
       workerWin.loadURL(dataUri);
 
       return new Promise((resolve) => {
-        workerWin.webContents.once('did-finish-load', () => {
-          console.log('[Print] ✅ HTML cargado — enviando a driver...');
+        // Fallback de Emergencia v18: Si Electron falla en 5s, usamos el motor nativo de Windows (mshtml)
+        const shellFallback = setTimeout(() => {
+          console.warn('[Print] ⚠️ Electron lento — Usando Rundll32 (Bypass de Windows)');
+          // rundll32 mshtml.dll,PrintHTML "archivo" "impresora" (Forma infalible de Windows)
+          const winCmd = `rundll32.exe mshtml.dll,PrintHTML "${tmpPath}" "${deviceName || ''}"`;
           
-          // Pequeño delay para renderizado de QR
+          exec(winCmd, (err) => {
+            if (workerWin && !workerWin.isDestroyed()) workerWin.destroy();
+            if (err) console.error('[Print] ❌ Fallo Rundll32:', err.message);
+            else console.log('[Print] ✨ Tiquete enviado por Windows (Rundll32).');
+            resolve({ ok: !err, error: err?.message });
+          });
+        }, 5000);
+
+        workerWin.webContents.once('did-finish-load', () => {
+          // Diferimos el print 3 segundos para dar tiempo a render de QR — Blindaje v20
           setTimeout(() => {
-            if (!workerWin || workerWin.isDestroyed()) {
-              printInProgress = false;
-              return resolve({ ok: false, error: 'Ventana cerrada' });
-            }
+            if (!workerWin || workerWin.isDestroyed()) return;
+
+            const isBigPrinter = pw > 100 || (deviceName && /HP|Class|Officejet|Inkjet/i.test(deviceName));
+            
+            console.log(`[Print] 🤖 Detector: Impresora ${isBigPrinter ? 'GRANDE (Tinta)' : 'PEQUEÑA (Térmica)'}`);
 
             workerWin.webContents.print(
               {
                 silent: true,
                 printBackground: true,
                 deviceName: deviceName || '',
-                margins: { marginType: 'default' } // 'default' es más compatible con XP-58
+                margins: { marginType: isBigPrinter ? 'default' : 'none' },
+                // Si es grande, forzamos Letter para que no escupa hojas extra
+                pageSize: isBigPrinter ? 'Letter' : { width: pw * 1000, height: 200000 }
               },
               (success, failureReason) => {
-                if (success) console.log('[Print] ✨ Tiquete enviado con éxito.');
-                else console.error('[Print] ❌ Error driver:', failureReason);
-                
-                if (workerWin && !workerWin.isDestroyed()) workerWin.destroy();
-                printInProgress = false;
-                resolve({ ok: success, error: failureReason });
+                if (success) {
+                  clearTimeout(shellFallback);
+                  console.log('[Print] ✨ Tiquete enviado con éxito.');
+                  if (workerWin && !workerWin.isDestroyed()) workerWin.destroy();
+                  resolve({ ok: true });
+                } else {
+                  console.warn('[Print] ⚠️ Fallo motor native:', failureReason, '— esperando Rundll32...');
+                }
               }
             );
-          }, 800);
-        });
-
-        workerWin.webContents.once('did-fail-load', (_e, _code, desc) => {
-          console.error('[Print] ❌ Fallo carga:', desc);
-          if (workerWin && !workerWin.isDestroyed()) workerWin.destroy();
-          printInProgress = false;
-          resolve({ ok: false, error: desc });
+          }, 3000);
         });
       });
 

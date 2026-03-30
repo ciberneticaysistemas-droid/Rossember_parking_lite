@@ -68,45 +68,52 @@ export const InvoiceTicket: React.FC<InvoiceTicketProps> = ({
   <head>
     <meta charset="utf-8">
     <title>Factura - ${record.plate}</title>
+    <style>
       /* Estilo v14: Retorno a la estabilidad */
       html, body {
         width: 100%;
+        height: auto !important;
         margin: 0; padding: 0;
         background: #fff; color: #000;
         font-size: ${fontSize}; line-height: 1.3;
+        overflow: hidden !important;
       }
 
       .ticket {
-        width: 280px; /* Ancho seguro para XP-58 */
-        margin: 0 auto;
-        padding: 4px;
-        text-align: center;
+        display: inline-block; /* Blindaje v20: evita rellenar toda la página */
+        width: 48mm;
+        max-width: 48mm;
+        margin: 0 0 0 2mm; /* Izquierda con margen de seguridad */
+        padding: 5px 0;
+        background: #fff;
+        text-align: left;
       }
 
-      .header            { margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 6px; }
+      .header            { margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 6px; text-align: center; }
       .logo              { font-size: ${logoSize}; font-weight: bold; margin-bottom: 2px; }
       .legal-info        { font-size: ${legalSize}; line-height: 1.2; }
-      .invoice-title     { font-size: ${isSmallThermal ? '10pt' : '11pt'}; font-weight: bold; text-transform: uppercase; margin: 6px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 0; }
-      .plate             { font-size: ${plateSize}; font-weight: bold; margin: 4px 0; line-height: 1; }
+      .invoice-title     { font-size: ${isSmallThermal ? '10pt' : '11pt'}; font-weight: bold; text-transform: uppercase; margin: 6px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 0; text-align: center; }
+      .plate             { font-size: ${plateSize}; font-weight: bold; margin: 4px 0; line-height: 1; text-align: center; }
       .details           { margin: 6px 0; text-align: left; }
       .detail-row        { display: flex; justify-content: space-between; padding: 1px 0; }
       .label             { font-weight: normal; }
       .value             { font-weight: bold; }
-      .divider           { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+      .divider           { border: none; border-top: 1px dashed #000; margin: 4px 0; width: 100%; }
       .totals            { margin: 6px 0; padding-top: 4px; border-top: 1px dashed #000; }
       .total-row         { display: flex; justify-content: space-between; padding: 1px 0; }
       .grand-total       { border-top: 1px solid #000; margin-top: 2px; padding-top: 4px; text-align: center; }
       .grand-total-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; }
       .grand-total-value { font-size: ${totalSize}; font-weight: bold; margin-top: 1px; }
       .cash-info         { margin-top: 4px; padding: 4px; border: 1px solid #000; }
-      .footer            { font-size: 7pt; margin-top: 8px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; }
+      .footer            { font-size: 7pt; margin-top: 8px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; text-align: center; }
 
       @page { size: auto; margin: 0mm; }
 
       @media print {
-        body { width: 280px !important; margin: 0 !important; padding: 0 !important; }
-        .ticket { width: 100% !important; padding: 4px 0 !important; }
+        body { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        .ticket { width: ${pageW} !important; margin: 0 0 0 2mm !important; }
       }
+    </style>
   </head>
   <body>
     <div class="ticket">
