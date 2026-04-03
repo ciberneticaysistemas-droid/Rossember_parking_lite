@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { Lock, Key, AlertTriangle } from 'lucide-react';
+import { Lock, Key, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { LicenseConfig } from '../types';
 
 interface LockScreenProps {
   config: LicenseConfig;
+  adminPassword?: string;
   onUnlock: () => void;
 }
 
-export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ config, adminPassword = 'AMCRJR', onUnlock }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
   const [showRecovery, setShowRecovery] = useState(false);
   const [masterPwd, setMasterPwd] = useState('');
+  
+  const [showPwdFields, setShowPwdFields] = useState(false);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +29,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
 
   const handleMasterUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (masterPwd === "AlejandroJuanCristopher") {
+    if (masterPwd === adminPassword || masterPwd === "AlejandroJuanCristopher") {
       onUnlock();
     } else {
       setError(true);
@@ -55,17 +58,24 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
 
             <form onSubmit={handleUnlock} className="space-y-4">
               <div className="relative">
-                <Key size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
-                  type="password"
+                  type={showPwdFields ? 'text' : 'password'}
                   placeholder="Contraseña General"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   autoFocus
-                  className={`w-full bg-slate-900 border-2 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-4 transition-all text-center tracking-[0.3em] font-mono text-xl ${
+                  className={`w-full bg-slate-900 border-2 rounded-2xl pl-12 pr-12 py-4 text-white placeholder-slate-600 focus:outline-none focus:ring-4 transition-all text-center tracking-[0.3em] font-mono text-xl ${
                     error ? 'border-red-500 focus:ring-red-500/20 shake' : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500/20'
                   }`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPwdFields(!showPwdFields)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPwdFields ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
 
               <button
@@ -92,13 +102,20 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, onUnlock }) => {
             <form onSubmit={handleMasterUnlock} className="space-y-4">
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPwdFields ? 'text' : 'password'}
                   placeholder="Clave Maestra"
                   value={masterPwd}
                   onChange={e => setMasterPwd(e.target.value)}
                   autoFocus
-                  className="w-full bg-slate-900 border-2 border-blue-900/50 rounded-2xl px-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-center font-mono"
+                  className="w-full bg-slate-900 border-2 border-blue-900/50 rounded-2xl px-4 pr-12 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-center font-mono"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPwdFields(!showPwdFields)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-400 transition-colors"
+                >
+                  {showPwdFields ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
 
               <button

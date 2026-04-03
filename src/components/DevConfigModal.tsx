@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Key, Calendar, ShieldAlert, Save, Trash2, CheckCircle } from 'lucide-react';
+import { X, Lock, Calendar, ShieldAlert, Save, Trash2, CheckCircle } from 'lucide-react';
 import { LicenseConfig } from '../types';
 
 interface DevConfigModalProps {
@@ -89,23 +89,6 @@ export const DevConfigModal: React.FC<DevConfigModalProps> = ({ currentConfig, o
                   onChange={e => setDateStr(e.target.value)}
                   className="w-full bg-[#0f1025] border border-blue-800/50 rounded-xl p-3 text-white focus:border-blue-500 outline-none font-mono text-sm shadow-inner"
                 />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5 block flex items-center gap-1.5">
-                  <Key size={12} /> Clave General de Desbloqueo
-                </label>
-                <input
-                  type="text"
-                  value={config.unlockPassword}
-                  onChange={e => setConfig(c => ({ ...c, unlockPassword: e.target.value }))}
-                  placeholder="Ej: 12345"
-                  className="w-full bg-[#0f1025] border border-blue-800/50 rounded-xl p-3 text-white focus:border-blue-500 outline-none font-mono text-sm tracking-widest shadow-inner text-center"
-                />
-                <p className="text-[10px] text-gray-500 mt-1.5 leading-tight">
-                  Esta será la contraseña requerida por el sistema para seguir operando una vez que pase la fecha límite.
-                </p>
               </div>
             </div>
           )}

@@ -27,6 +27,7 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { key: 'switchToEntry', label: 'Cambiar a Pestaña ENTRADA', context: 'Navegación' },
   { key: 'switchToExit', label: 'Cambiar a Pestaña SALIDA', context: 'Navegación' },
   { key: 'printDocument', label: 'Imprimir Ticket / Factura', context: 'General' },
+  { key: 'toggleHelmet', label: 'Toggle Casco (Dejar/Quitar)', context: 'Entrada' },
 ];
 
 export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
@@ -40,9 +41,21 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
   const handleKeyCapture = (key: keyof KeyboardShortcutsConfig, e: React.KeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
     // Ignore modifier keys being pressed alone
     if (['Control', 'Shift', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
-    setConfig(prev => ({ ...prev, [key]: e.key }));
+
+    let combo = '';
+    if (e.ctrlKey) combo += 'Ctrl+';
+    if (e.altKey) combo += 'Alt+';
+    if (e.shiftKey) combo += 'Shift+';
+    
+    // Normalize key name (e.g. 'control' -> 'Ctrl') is mostly handled by the logic above
+    // but we want the actual key at the end
+    const keyName = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    combo += keyName;
+
+    setConfig(prev => ({ ...prev, [key]: combo }));
     setCapturingKey(null);
   };
 

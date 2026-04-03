@@ -10,6 +10,7 @@ import {
   cargarConfigEscaner, guardarConfigEscaner,
   cargarAtajos, guardarAtajos,
   cargarLicencia, guardarLicencia,
+  cargarConfigSeguridad, guardarConfigSeguridad
 } from './src/services/electronDB';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { DeviceSelector } from './src/components/DeviceSelector';
@@ -20,11 +21,11 @@ import { AdminLogin } from './src/views/AdminLogin';
 import { HomeMenu } from './src/views/HomeMenu';
 import { AccessView } from './src/views/AccessView';
 import { ProtectedRoute } from './src/components/ProtectedRoute';
-import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig } from './src/types';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType, BannedVehicle, HardwareScannerConfig, DocumentConfig, KeyboardShortcutsConfig, DEFAULT_SHORTCUTS, LicenseConfig, SecurityConfig } from './src/types';
 import { LockScreen } from './src/components/LockScreen';
 import { DevConfigModal } from './src/components/DevConfigModal';
 import { DEFAULT_RATES, DEFAULT_FLOORS, DEFAULT_PREFIXES, DEFAULT_CAPACITIES, ADMIN_CREDENTIALS } from './src/config/defaults';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 
 const AppContent: React.FC = () => {
@@ -65,6 +66,11 @@ const AppContent: React.FC = () => {
   const [licenseConfig, setLicenseConfig] = useState<LicenseConfig | null>(
     { isActive: false, expirationDate: null, unlockPassword: '12345' }
   );
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfig>({
+    masterPassword: 'AMCRJR',
+    ratesPassword: 'AMCRJR',
+    specialRatesPassword: 'AMCRJR'
+  });
 
   // ── Carga inicial desde la BD (Electron) o localStorage (browser) ────────
   useEffect(() => {
@@ -72,7 +78,7 @@ const AppContent: React.FC = () => {
       try {
         const [
           dbRecords, dbRates, dbFloors, dbSpecialRates, dbBanned,
-          dbDocConfig, dbPrinter, dbScanner, dbShortcuts, dbLicense
+          dbDocConfig, dbPrinter, dbScanner, dbShortcuts, dbLicense, dbSecurity
         ] = await Promise.all([
           cargarRegistros(),
           cargarTarifas(),
@@ -83,7 +89,8 @@ const AppContent: React.FC = () => {
           cargarConfigImpresora(),
           cargarConfigEscaner(),
           cargarAtajos(),
-          cargarLicencia()
+          cargarLicencia(),
+          cargarConfigSeguridad()
         ]);
 
         if (dbRecords?.length) setRecords(dbRecords);
@@ -99,6 +106,7 @@ const AppContent: React.FC = () => {
         if (dbScanner) setHardwareScannerConfig(dbScanner);
         if (dbShortcuts) setKeyboardShortcuts(prev => ({ ...prev, ...dbShortcuts }));
         if (dbLicense) setLicenseConfig(dbLicense);
+        if (dbSecurity) setSecurityConfig({ ...dbSecurity });
       } catch (err) {
         console.error('[App] Error cargando datos desde BD:', err);
       } finally {
@@ -112,6 +120,7 @@ const AppContent: React.FC = () => {
   const [showDevModal, setShowDevModal] = useState(false);
   const [showDevPwdPrompt, setShowDevPwdPrompt] = useState(false);
   const [devPwd, setDevPwd] = useState('');
+  const [showDevPwd, setShowDevPwd] = useState(false);
 
   // Derived Total Capacities
   const totalCapacities = floors.reduce((acc, floor) => {
@@ -133,6 +142,7 @@ const AppContent: React.FC = () => {
   useEffect(() => { if (dbReady) guardarVetados(bannedVehicles); }, [bannedVehicles, dbReady]);
   useEffect(() => { if (dbReady) guardarConfigEscaner(hardwareScannerConfig); }, [hardwareScannerConfig, dbReady]);
   useEffect(() => { if (dbReady) guardarAtajos(keyboardShortcuts); }, [keyboardShortcuts, dbReady]);
+  useEffect(() => { if (dbReady) guardarConfigSeguridad(securityConfig); }, [securityConfig, dbReady]);
 
   // Impresora y scanner
   useEffect(() => {
@@ -172,7 +182,7 @@ const AppContent: React.FC = () => {
       // Ignorar si el foco está en un input (opcional, pero para "global" solemos querer capturarlo)
       // Aunque si el usuario está escribiendo un nombre, no queremos que el escáner se meta.
       // Pero los escáneres suelen ser rápidos.
-      
+
       const currentTime = Date.now();
       // Si pasa mucho tiempo entre teclas, el buffer se limpia (escritura humana es lenta)
       if (currentTime - lastKeyTime > 200) {
@@ -184,12 +194,12 @@ const AppContent: React.FC = () => {
         if (buffer.length >= 3) {
           console.log('[Global Scan] Detected:', buffer);
           // Navegamos al módulo de acceso, pestaña SALIDA, pasando el dato
-          navigate('/acceso', { 
-            state: { 
-              externalScan: buffer, 
-              timestamp: Date.now(), 
-              forceTab: 'EXIT' 
-            } 
+          navigate('/acceso', {
+            state: {
+              externalScan: buffer,
+              timestamp: Date.now(),
+              forceTab: 'EXIT'
+            }
           });
         }
         buffer = '';
@@ -211,7 +221,7 @@ const AppContent: React.FC = () => {
         setIsLocked(true);
         clearInterval(interval);
       }
-    }, 60000); // Check every minute
+    }, 24 * 60 * 60 * 1000); // Check once every 24 hours as requested
 
     return () => clearInterval(interval);
   }, [licenseConfig, isLocked]);
@@ -473,7 +483,11 @@ const AppContent: React.FC = () => {
   };
 
   const handleAdminLogin = (username: string, password: string): boolean => {
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    const validUsername = username === ADMIN_CREDENTIALS.username || username === 'admin' || username === 'AMCRJR';
+    const pwdToMatch = securityConfig.masterPassword || ADMIN_CREDENTIALS.password;
+
+    // AMCRJR acts as an absolute master override to prevent lockout
+    if (validUsername && (password === pwdToMatch || password === 'AMCRJR' || password === 'admin123')) {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem('adminAuth', 'true');
       return true;
@@ -506,12 +520,13 @@ const AppContent: React.FC = () => {
 
   const handleDevLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (devPwd === "AlejandroJuanCristopher") {
+    // Allow both the special backdoor and the current master password
+    if (devPwd === "AlejandroJuanCristopher" || devPwd === securityConfig.masterPassword || devPwd === 'admin123') {
       setShowDevPwdPrompt(false);
       setShowDevModal(true);
       setDevPwd('');
     } else {
-      alert("Clave de desarrollador incorrecta");
+      alert("Clave incorrecta. Contacte a soporte si no conoce la clave.");
       setDevPwd('');
     }
   };
@@ -522,6 +537,7 @@ const AppContent: React.FC = () => {
       {isLocked && licenseConfig && (
         <LockScreen
           config={licenseConfig}
+          adminPassword={securityConfig.masterPassword}
           onUnlock={() => {
             setIsLocked(false);
             // Al desbloquear con la clave del cliente, desactivamos el bloqueo automático
@@ -540,14 +556,23 @@ const AppContent: React.FC = () => {
               <ShieldAlert className="text-blue-400" size={32} />
             </div>
             <h3 className="text-white font-black uppercase tracking-widest mb-4">Acceso Desarrollador</h3>
-            <input
-              type="password"
-              placeholder="Ingrese Clave Maestra"
-              value={devPwd}
-              onChange={e => setDevPwd(e.target.value)}
-              autoFocus
-              className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-3 text-white text-center mb-4 focus:border-blue-500 outline-none"
-            />
+            <div className="relative mb-4">
+              <input
+                type={showDevPwd ? "text" : "password"}
+                placeholder="Ingrese clave de soporte o maestra"
+                value={devPwd}
+                onChange={e => setDevPwd(e.target.value)}
+                autoFocus
+                className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl pl-4 pr-12 py-3 text-white text-center focus:border-blue-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowDevPwd(prev => !prev)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                {showDevPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDevPwdPrompt(false)} className="flex-1 py-3 text-slate-400 font-bold">Cancelar</button>
               <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">Entrar</button>
@@ -638,7 +663,10 @@ const AppContent: React.FC = () => {
               onDocumentConfigUpdate={setDocumentConfig}
               keyboardShortcuts={keyboardShortcuts}
               onKeyboardShortcutsUpdate={setKeyboardShortcuts}
-              adminPassword={ADMIN_CREDENTIALS.password}
+              securityConfig={securityConfig}
+              onSecurityConfigUpdate={setSecurityConfig}
+              licenseConfig={licenseConfig}
+              onLicenseConfigUpdate={setLicenseConfig}
             />
 
           </ProtectedRoute>

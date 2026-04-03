@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2, Calendar, CreditCard, AlertTriangle, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Trash2, Calendar, CreditCard, AlertTriangle, User, Search } from 'lucide-react';
 import { SpecialRate, SpecialRateType } from '../types';
 
 interface SpecialRatesModalProps {
@@ -21,10 +21,27 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
     const [newExpiration, setNewExpiration] = useState('');
     const [addError, setAddError] = useState<string | null>(null);
 
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
+
     const handleAdd = () => {
         setAddError(null);
         if (!newPlate) {
             setAddError('⚠️ La placa es obligatoria.');
+            return;
+        }
+
+        // Validate uniqueness: Only one active special rate per plate
+        const existingActive = specialRates.find(r => r.plate === newPlate.toUpperCase() && r.isActive);
+        if (existingActive) {
+            setAddError('⚠️ Esta placa ya tiene una tarifa especial activa. Elimínela antes de crear una nueva.');
             return;
         }
 
@@ -76,6 +93,13 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
     };
 
     const activeRates = specialRates.filter(r => r.isActive);
+    
+    // Check search filter
+    const filteredRates = activeRates.filter(r => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toUpperCase();
+        return r.plate.includes(query) || (r.ownerId && r.ownerId.includes(query)) || r.type.toUpperCase().includes(query);
+    });
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
@@ -198,17 +222,29 @@ export const SpecialRatesModal: React.FC<SpecialRatesModalProps> = ({
                 </div>
 
                 {/* List Section */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    <h3 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Placas en Convenio ({activeRates.length})</h3>
+                <div className="flex-1 overflow-hidden p-6 flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Placas en Convenio ({activeRates.length})</h3>
+                        <div className="relative w-64">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Buscar placa, cédula o tipo..."
+                                className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-yellow-500 transition-colors"
+                            />
+                        </div>
+                    </div>
 
-                    {activeRates.length === 0 ? (
+                    {filteredRates.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-slate-600 opacity-50">
                             <AlertTriangle size={48} className="mb-4" />
-                            <p>No hay tarifas especiales registradas</p>
+                            <p>No se encontraron tarifas que coincidan.</p>
                         </div>
                     ) : (
-                        <div className="grid gap-3">
-                            {activeRates.map((rate) => (
+                        <div className="grid gap-3 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                            {filteredRates.map((rate) => (
                                 <div key={rate.id} className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 flex justify-between items-center group hover:border-slate-500 transition-colors">
                                     <div className="flex items-center gap-6">
                                         <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 min-w-[120px] text-center">

@@ -63,6 +63,6 @@ export const DEFAULT_RATES: Record<string, number> = {
 // los valores de fallback. Para producción, SIEMPRE configurar las variables
 // VITE_ADMIN_USERNAME y VITE_ADMIN_PASSWORD en el entorno o GitHub Secrets.
 export const ADMIN_CREDENTIALS = {
-  username: import.meta.env.VITE_ADMIN_USERNAME || 'admin',
-  password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123',
+  username: import.meta.env.VITE_ADMIN_USERNAME || 'AMCRJR',
+  password: import.meta.env.VITE_ADMIN_PASSWORD || 'AMCRJR',
 };

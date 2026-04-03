@@ -105,6 +105,7 @@ export interface KeyboardShortcutsConfig {
   switchToEntry: string;
   switchToExit: string;
   printDocument: string;
+  toggleHelmet: string;
 }
 
 export const DEFAULT_SHORTCUTS: KeyboardShortcutsConfig = {
@@ -120,11 +121,18 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcutsConfig = {
   switchToEntry: 'F1',
   switchToExit: 'F12',
   printDocument: 'F11',
+  toggleHelmet: 'Alt+H',
 };
 
 export interface LicenseConfig {
   expirationDate: number | null; // ms timestamp, si es null no hay limite
   unlockPassword?: string; // default será "12345"
   isActive: boolean; // para habilitarlo o deshabilitarlo facilmente
+}
+
+export interface SecurityConfig {
+  masterPassword?: string; // Por defecto deberia ser admin123
+  ratesPassword?: string;  // Por defecto admin123
+  specialRatesPassword?: string; // Por defecto admin123
 }
 

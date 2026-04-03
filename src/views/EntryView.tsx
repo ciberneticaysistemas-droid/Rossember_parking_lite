@@ -143,10 +143,12 @@ export const EntryView: React.FC<EntryViewProps> = ({
       [shortcuts.toggleMoto]: () => setManualType(VehicleType.MOTORCYCLE),
       [shortcuts.toggleBike]: () => setManualType(VehicleType.BICYCLE),
       [shortcuts.toggleAccessibility]: () => setIsAccessibilityMode(prev => !prev),
-      'Alt+H': () => {
+      [shortcuts.toggleHelmet]: () => {
         if (manualType === VehicleType.MOTORCYCLE) {
-          setLeavesHelmet(true);
-          setTimeout(() => helmetDescriptionRef.current?.focus(), 100);
+          setLeavesHelmet(prev => !prev);
+          if (!leavesHelmet) {
+            setTimeout(() => helmetDescriptionRef.current?.focus(), 100);
+          }
         }
       },
     });
@@ -592,7 +594,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
                                                     </div>
                                                     <div>
                                                         <span className="font-bold text-gray-800">¿Deja Casco?</span>
-                                                        <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded border bg-orange-100 border-orange-200 text-orange-600 font-black">Alt+H</span>
+                                                        <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded border bg-orange-100 border-orange-200 text-orange-600 font-black">{shortcuts.toggleHelmet}</span>
                                                     </div>
                                                 </div>
                                                 <button

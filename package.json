@@ -73,7 +73,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Rossember Parking"
+      "shortcutName": "Core Parking",
+      "artifactName": "${productName} Setup.${ext}"
     },
     "mac": {
       "target": "dmg",

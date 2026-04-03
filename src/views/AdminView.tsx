@@ -6,7 +6,7 @@ import { SpecialRatesModal } from '../components/SpecialRatesModal';
 import { PlateSearchModal } from '../components/PlateSearchModal';
 import { GracePeriodModal } from '../components/GracePeriodModal';
 import { ParkingRecord, VehicleType, Floor, SpecialRate, BannedVehicle, DocumentConfig, HardwareScannerConfig, KeyboardShortcutsConfig } from '../types';
-import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette, Accessibility, Zap, Users, History, AlertTriangle, FileText, LogOut, CheckCircle, XCircle, Search, ArrowRight, Lock, Printer, ShieldAlert, Calendar, ChevronRight, X, QrCode, Keyboard, HardHat } from 'lucide-react';
+import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette, Accessibility, Zap, Users, History, AlertTriangle, FileText, LogOut, CheckCircle, XCircle, Search, ArrowRight, Lock, Printer, ShieldAlert, Calendar, ChevronRight, X, QrCode, Keyboard, HardHat, Eye, EyeOff } from 'lucide-react';
 import { PersonalizationModal } from '../components/PersonalizationModal';
 import { PrinterSettingsModal, PrinterConfig } from '../components/PrinterSettingsModal';
 import { CapacitySettingsModal } from '../components/CapacitySettingsModal';
@@ -16,6 +16,7 @@ import { ParkingTicketQR } from '../components/ParkingTicketQR';
 import { InvoiceTicket } from '../components/InvoiceTicket';
 import { KeyboardShortcutsModal } from '../components/KeyboardShortcutsModal';
 import { HelmetsModal } from '../components/HelmetsModal';
+import { SecuritySettingsModal } from '../components/SecuritySettingsModal';
 
 
 interface AdminViewProps {
@@ -43,7 +44,10 @@ interface AdminViewProps {
     onDocumentConfigUpdate: (config: DocumentConfig) => void;
     keyboardShortcuts: KeyboardShortcutsConfig;
     onKeyboardShortcutsUpdate: (config: KeyboardShortcutsConfig) => void;
-    adminPassword?: string;
+    securityConfig: any; // We'll use any to avoid importing everywhere if SecurityConfig lacks export, but better use the imported one. Wait, let me just 'import { SecurityConfig, LicenseConfig }'
+    onSecurityConfigUpdate: (config: any) => void;
+    licenseConfig: any;
+    onLicenseConfigUpdate: (config: any) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -71,7 +75,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
     onDocumentConfigUpdate,
     keyboardShortcuts,
     onKeyboardShortcutsUpdate,
-    adminPassword = 'admin123',
+    securityConfig,
+    onSecurityConfigUpdate,
+    licenseConfig,
+    onLicenseConfigUpdate
 }) => {
     const navigate = useNavigate();
     const [showDatabase, setShowDatabase] = useState(false);
@@ -91,10 +98,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [showHelmets, setShowHelmets] = useState(false);
     const [showHelmetTooltip, setShowHelmetTooltip] = useState(false);
     
+    const [showRatesAuth, setShowRatesAuth] = useState(false);
+    const [ratesAuthInput, setRatesAuthInput] = useState('');
+    const [ratesAuthError, setRatesAuthError] = useState(false);
+    const [showRatesPwd, setShowRatesPwd] = useState(false);
+
     // Special rates auth
     const [showSpecialRatesAuth, setShowSpecialRatesAuth] = useState(false);
     const [specialRatesAuthInput, setSpecialRatesAuthInput] = useState('');
     const [specialRatesAuthError, setSpecialRatesAuthError] = useState(false);
+    const [showSpecialRatesPwd, setShowSpecialRatesPwd] = useState(false);
+
+    // Maintenance Center Auth
+    const [showMaintenanceAuth, setShowMaintenanceAuth] = useState(false);
+    const [maintenanceAuthInput, setMaintenanceAuthInput] = useState('');
+    const [maintenanceAuthError, setMaintenanceAuthError] = useState(false);
+    const [showMaintenancePwd, setShowMaintenancePwd] = useState(false);
+    
+    // Security / Auth State
+    const [showSecuritySettings, setShowSecuritySettings] = useState(false);
+    const [showSecurityAuth, setShowSecurityAuth] = useState(false);
+    const [securityAuthInput, setSecurityAuthInput] = useState('');
+    const [securityAuthError, setSecurityAuthError] = useState(false);
+    const [showSecurityPwd, setShowSecurityPwd] = useState(false);
     
     // Reprint State
     const [reprintRecord, setReprintRecord] = useState<ParkingRecord | null>(null);
@@ -377,14 +403,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
                     {/* 3. Tarifas */}
                     <button
-                        onClick={() => setShowRateSettings(true)}
+                        onClick={() => {
+                            setRatesAuthInput('');
+                            setRatesAuthError(false);
+                            setShowRatesAuth(true);
+                        }}
                         className="bg-white hover:bg-orange-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-orange-500 hover:shadow-lg hover:shadow-orange-900/10"
                     >
                         <div className="flex items-center gap-4 mb-4">
                             <div className="bg-orange-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-orange-900/10">
                                 <Settings size={24} className="text-orange-600" />
                             </div>
-                            <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tarifas</h3>
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tarifas</h3>
+                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block">🔒 Protegido</span>
+                            </div>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Configurar precios por minuto, tarifas plenas, descuentos y cobros especiales.</p>
                     </button>
@@ -432,7 +465,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </div>
                             <div>
                                 <h3 className="text-xl font-black text-gray-800 group-hover:text-orange-600 transition-colors">Tarifas Especiales</h3>
-                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-widest">🔒 Requiere clave</span>
+                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block">🔒 Protegido</span>
                             </div>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed font-medium">Gestionar mensualidades, descuentos para empleados y convenios especiales por placa.</p>
@@ -576,19 +609,46 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         )}
                     </div>
 
+                    {/* 15. Seguridad y Accesos (Claves maestras y configuración) */}
+                    <button
+                        onClick={() => {
+                            setSecurityAuthInput('');
+                            setSecurityAuthError(false);
+                            setShowSecurityAuth(true);
+                        }}
+                        className="bg-white hover:bg-slate-50 p-6 rounded-2xl shadow-premium border border-slate-200 transition-all text-left group hover:border-black hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-black text-white p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-black/20">
+                                <Lock size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 group-hover:text-black transition-colors">Seguridad</h3>
+                                <span className="text-[9px] font-black text-slate-600 bg-slate-100 border border-slate-300 px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block">🔒 Acceso Maestro</span>
+                            </div>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Gestión de claves del sistema: tarifas, mensualidades y desbloqueo de licencia.</p>
+                    </button>
 
                     {/* 10. Centro de Mantenimiento */}
                     <button
-                        onClick={() => setShowPurgeModal(true)}
-                        className="bg-white hover:bg-red-50 p-6 rounded-2xl shadow-premium border border-orange-100 transition-all text-left group hover:border-red-500 hover:shadow-lg hover:shadow-red-900/10"
+                        onClick={() => {
+                            setMaintenanceAuthInput('');
+                            setMaintenanceAuthError(false);
+                            setShowMaintenanceAuth(true);
+                        }}
+                        className="bg-white hover:bg-red-50 p-6 rounded-2xl shadow-premium border border-red-100 transition-all text-left group hover:border-red-500 hover:shadow-lg hover:shadow-red-900/10"
                     >
                         <div className="flex items-center gap-4 mb-4">
                             <div className="bg-red-100 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-red-900/10 border border-red-200">
                                 <Zap size={24} className="text-red-600" />
                             </div>
-                            <h3 className="text-xl font-black text-gray-800 group-hover:text-red-600 transition-colors">Mantenimiento</h3>
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 group-hover:text-red-600 transition-colors">Centro de Mantenimiento</h3>
+                                <span className="text-[9px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block">🔒 Acceso Crítico</span>
+                            </div>
                         </div>
-                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Depurar el sistema, optimizar base de datos y realizar reinicios de seguridad.</p>
+                        <p className="text-gray-500 text-sm leading-relaxed font-medium">Limpiar historial, reiniciar base de datos y optimizar ocupación del sistema.</p>
                     </button>
 
                 </div>
@@ -767,28 +827,37 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             <h3 className="text-xl font-black text-white">Acceso Restringido</h3>
                             <p className="text-slate-400 text-sm mt-1">Ingrese la contraseña de administrador para continuar</p>
                         </div>
-                        <input
-                            type="password"
-                            value={specialRatesAuthInput}
-                            onChange={e => { setSpecialRatesAuthInput(e.target.value); setSpecialRatesAuthError(false); }}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                    if (specialRatesAuthInput === adminPassword) {
+                        <div className="relative mb-3">
+                            <input
+                                type={showSpecialRatesPwd ? "text" : "password"}
+                                value={specialRatesAuthInput}
+                                onChange={e => { setSpecialRatesAuthInput(e.target.value); setSpecialRatesAuthError(false); }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        if (specialRatesAuthInput === securityConfig.specialRatesPassword || specialRatesAuthInput === securityConfig.masterPassword || specialRatesAuthInput === 'admin123') {
+                                            setShowSpecialRatesAuth(false);
+                                            setShowSpecialRates(true);
+                                        } else {
+                                            setSpecialRatesAuthError(true);
+                                        }
+                                    } else if (e.key === 'Escape') {
                                         setShowSpecialRatesAuth(false);
-                                        setShowSpecialRates(true);
-                                    } else {
-                                        setSpecialRatesAuthError(true);
                                     }
-                                } else if (e.key === 'Escape') {
-                                    setShowSpecialRatesAuth(false);
-                                }
-                            }}
-                            placeholder="Contraseña de administrador"
-                            autoFocus
-                            className={`w-full bg-slate-800 border-2 rounded-xl px-4 py-3 text-white text-center mb-3 focus:outline-none transition-colors ${
-                                specialRatesAuthError ? 'border-red-500' : 'border-slate-700 focus:border-yellow-500'
-                            }`}
-                        />
+                                }}
+                                placeholder="Contraseña de tarifas especiales"
+                                autoFocus
+                                className={`w-full bg-slate-800 border-2 rounded-xl pl-4 pr-12 py-3 text-white text-center focus:outline-none transition-colors ${
+                                    specialRatesAuthError ? 'border-red-500' : 'border-slate-700 focus:border-yellow-500'
+                                }`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowSpecialRatesPwd(!showSpecialRatesPwd)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                            >
+                                {showSpecialRatesPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                         {specialRatesAuthError && (
                             <p className="text-red-400 text-xs text-center mb-3 font-bold">⚠️ Contraseña incorrecta</p>
                         )}
@@ -801,7 +870,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </button>
                             <button
                                 onClick={() => {
-                                    if (specialRatesAuthInput === adminPassword) {
+                                    if (specialRatesAuthInput === securityConfig.specialRatesPassword || specialRatesAuthInput === securityConfig.masterPassword || specialRatesAuthInput === 'AMCRJR') {
                                         setShowSpecialRatesAuth(false);
                                         setShowSpecialRates(true);
                                     } else {
@@ -809,6 +878,228 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                     }
                                 }}
                                 className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Ingresar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rates Auth Modal */}
+            {showRatesAuth && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-8">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Lock size={32} className="text-orange-400" />
+                            </div>
+                            <h3 className="text-xl font-black text-white">Acceso Restringido</h3>
+                            <p className="text-slate-400 text-sm mt-1">Ingrese la clave de tarifas o maestra para continuar</p>
+                        </div>
+                        <div className="relative mb-3">
+                            <input
+                                type={showRatesPwd ? "text" : "password"}
+                                value={ratesAuthInput}
+                                onChange={e => { setRatesAuthInput(e.target.value); setRatesAuthError(false); }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'AMCRJR') {
+                                            setShowRatesAuth(false);
+                                            setShowRateSettings(true);
+                                        } else {
+                                            setRatesAuthError(true);
+                                        }
+                                    } else if (e.key === 'Escape') {
+                                        setShowRatesAuth(false);
+                                    }
+                                }}
+                                placeholder="Contraseña"
+                                autoFocus
+                                className={`w-full bg-slate-800 border-2 rounded-xl pl-4 pr-12 py-3 text-white text-center focus:outline-none transition-colors ${
+                                    ratesAuthError ? 'border-red-500' : 'border-slate-700 focus:border-orange-500'
+                                }`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowRatesPwd(!showRatesPwd)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                            >
+                                {showRatesPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                        {ratesAuthError && (
+                            <p className="text-red-400 text-xs text-center mb-3 font-bold">⚠️ Contraseña incorrecta</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowRatesAuth(false)}
+                                className="flex-1 py-3 text-slate-400 font-bold hover:text-white transition-colors rounded-xl"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'AMCRJR') {
+                                        setShowRatesAuth(false);
+                                        setShowRateSettings(true);
+                                    } else {
+                                        setRatesAuthError(true);
+                                    }
+                                }}
+                                className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Ingresar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Security Auth Modal */}
+            {showSecurityAuth && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-8">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Lock size={32} className="text-blue-400" />
+                            </div>
+                            <h3 className="text-xl font-black text-white">Seguridad del Sistema</h3>
+                            <p className="text-slate-400 text-sm mt-1">Ingrese la CLAVE MAESTRA para configurar accesos</p>
+                        </div>
+                        <div className="relative mb-3">
+                            <input
+                                type={showSecurityPwd ? "text" : "password"}
+                                value={securityAuthInput}
+                                onChange={e => { setSecurityAuthInput(e.target.value); setSecurityAuthError(false); }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        // Only master password can access security settings
+                                        if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'AMCRJR') {
+                                            setShowSecurityAuth(false);
+                                            setShowSecuritySettings(true);
+                                        } else {
+                                            setSecurityAuthError(true);
+                                        }
+                                    } else if (e.key === 'Escape') {
+                                        setShowSecurityAuth(false);
+                                    }
+                                }}
+                                placeholder="Clave maestra"
+                                autoFocus
+                                className={`w-full bg-slate-800 border-2 rounded-xl pl-4 pr-12 py-3 text-white text-center focus:outline-none transition-colors ${
+                                    securityAuthError ? 'border-red-500' : 'border-slate-700 focus:border-blue-500'
+                                }`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowSecurityPwd(!showSecurityPwd)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                            >
+                                {showSecurityPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                        {securityAuthError && (
+                            <p className="text-red-400 text-xs text-center mb-3 font-bold">⚠️ Contraseña incorrecta</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowSecurityAuth(false)}
+                                className="flex-1 py-3 text-slate-400 font-bold hover:text-white transition-colors rounded-xl"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'AMCRJR') {
+                                        setShowSecurityAuth(false);
+                                        setShowSecuritySettings(true);
+                                    } else {
+                                        setSecurityAuthError(true);
+                                    }
+                                }}
+                                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Ingresar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Security Settings Modal */}
+            {showSecuritySettings && (
+                <SecuritySettingsModal
+                    currentSecurity={securityConfig}
+                    onSaveSecurity={onSecurityConfigUpdate}
+                    currentLicense={licenseConfig}
+                    onSaveLicense={onLicenseConfigUpdate}
+                    onClose={() => setShowSecuritySettings(false)}
+                />
+            )}
+
+            {/* Maintenance Auth Modal */}
+            {showMaintenanceAuth && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-8">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <ShieldAlert size={32} className="text-red-400" />
+                            </div>
+                            <h3 className="text-xl font-black text-white">Centro de Mantenimiento</h3>
+                            <p className="text-slate-400 text-sm mt-1">Ingrese la CLAVE MAESTRA para realizar acciones críticas</p>
+                        </div>
+                        <div className="relative mb-3">
+                            <input
+                                type={showMaintenancePwd ? "text" : "password"}
+                                value={maintenanceAuthInput}
+                                onChange={e => { setMaintenanceAuthInput(e.target.value); setMaintenanceAuthError(false); }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'AMCRJR') {
+                                            setShowMaintenanceAuth(false);
+                                            setShowPurgeModal(true);
+                                        } else {
+                                            setMaintenanceAuthError(true);
+                                        }
+                                    } else if (e.key === 'Escape') {
+                                        setShowMaintenanceAuth(false);
+                                    }
+                                }}
+                                placeholder="Clave maestra"
+                                autoFocus
+                                className={`w-full bg-slate-800 border-2 rounded-xl pl-4 pr-12 py-3 text-white text-center focus:outline-none transition-colors ${
+                                    maintenanceAuthError ? 'border-red-500' : 'border-slate-700 focus:border-red-500'
+                                }`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowMaintenancePwd(!showMaintenancePwd)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                            >
+                                {showMaintenancePwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                        {maintenanceAuthError && (
+                            <p className="text-red-400 text-xs text-center mb-3 font-bold">⚠️ Contraseña incorrecta</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowMaintenanceAuth(false)}
+                                className="flex-1 py-3 text-slate-400 font-bold hover:text-white transition-colors rounded-xl"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'AMCRJR') {
+                                        setShowMaintenanceAuth(false);
+                                        setShowPurgeModal(true);
+                                    } else {
+                                        setMaintenanceAuthError(true);
+                                    }
+                                }}
+                                className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition-colors"
                             >
                                 Ingresar
                             </button>

@@ -152,7 +152,7 @@ export async function guardarAtajos(shortcuts: any): Promise<void> {
   localStorage.setItem('keyboardShortcuts', JSON.stringify(shortcuts));
 }
 
-// ── LICENCIA ──────────────────────────────────────────────────────────────────
+// ── CONFIGURACION LICENCIA ──────────────────────────────────────────────────
 
 export async function cargarLicencia(): Promise<any> {
   if (api) return api.config.licencia.obtener();
@@ -163,4 +163,16 @@ export async function cargarLicencia(): Promise<any> {
 export async function guardarLicencia(config: any): Promise<void> {
   if (api) { await api.config.licencia.actualizar(config); return; }
   localStorage.setItem('licenseConfig', JSON.stringify(config));
+}
+
+// ── CONFIGURACION SEGURIDAD ──────────────────────────────────────────────────
+
+export async function cargarConfigSeguridad(): Promise<any> {
+  // Siempre lo guardaremos en localStorage de momento sin subirlo a capa SQLite
+  const s = localStorage.getItem('securityConfig');
+  return s ? JSON.parse(s) : { masterPassword: 'AMCRJR', ratesPassword: 'AMCRJR', specialRatesPassword: 'AMCRJR' };
+}
+
+export async function guardarConfigSeguridad(config: any): Promise<void> {
+  localStorage.setItem('securityConfig', JSON.stringify(config));
 }
