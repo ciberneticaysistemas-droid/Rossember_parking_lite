@@ -870,7 +870,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </button>
                             <button
                                 onClick={() => {
-                                    if (specialRatesAuthInput === securityConfig.specialRatesPassword || specialRatesAuthInput === securityConfig.masterPassword || specialRatesAuthInput === 'AMCRJR') {
+                                    if (specialRatesAuthInput === securityConfig.specialRatesPassword || specialRatesAuthInput === securityConfig.masterPassword || specialRatesAuthInput === 'velvetsoftware97531') {
                                         setShowSpecialRatesAuth(false);
                                         setShowSpecialRates(true);
                                     } else {
@@ -904,7 +904,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 onChange={e => { setRatesAuthInput(e.target.value); setRatesAuthError(false); }}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter') {
-                                        if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'AMCRJR') {
+                                        if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'velvetsoftware97531') {
                                             setShowRatesAuth(false);
                                             setShowRateSettings(true);
                                         } else {
@@ -940,7 +940,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </button>
                             <button
                                 onClick={() => {
-                                    if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'AMCRJR') {
+                                    if (ratesAuthInput === securityConfig.ratesPassword || ratesAuthInput === securityConfig.masterPassword || ratesAuthInput === 'velvetsoftware97531') {
                                         setShowRatesAuth(false);
                                         setShowRateSettings(true);
                                     } else {
@@ -975,7 +975,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 onKeyDown={e => {
                                     if (e.key === 'Enter') {
                                         // Only master password can access security settings
-                                        if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'AMCRJR') {
+                                        if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'velvetsoftware97531') {
                                             setShowSecurityAuth(false);
                                             setShowSecuritySettings(true);
                                         } else {
@@ -1011,7 +1011,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </button>
                             <button
                                 onClick={() => {
-                                    if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'AMCRJR') {
+                                    if (securityAuthInput === securityConfig.masterPassword || securityAuthInput === 'velvetsoftware97531') {
                                         setShowSecurityAuth(false);
                                         setShowSecuritySettings(true);
                                     } else {
@@ -1056,7 +1056,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 onChange={e => { setMaintenanceAuthInput(e.target.value); setMaintenanceAuthError(false); }}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter') {
-                                        if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'AMCRJR') {
+                                        if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'velvetsoftware97531') {
                                             setShowMaintenanceAuth(false);
                                             setShowPurgeModal(true);
                                         } else {
@@ -1092,7 +1092,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </button>
                             <button
                                 onClick={() => {
-                                    if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'AMCRJR') {
+                                    if (maintenanceAuthInput === securityConfig.masterPassword || maintenanceAuthInput === 'velvetsoftware97531') {
                                         setShowMaintenanceAuth(false);
                                         setShowPurgeModal(true);
                                     } else {

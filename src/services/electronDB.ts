@@ -157,7 +157,12 @@ export async function guardarAtajos(shortcuts: any): Promise<void> {
 export async function cargarLicencia(): Promise<any> {
   if (api) return api.config.licencia.obtener();
   const s = localStorage.getItem('licenseConfig');
-  return s ? JSON.parse(s) : { isActive: false, expirationDate: null, unlockPassword: '12345' };
+  if (s) {
+    const parsed = JSON.parse(s);
+    if (parsed.unlockPassword === '12345') parsed.unlockPassword = 'licenciavelvetsoftware';
+    return parsed;
+  }
+  return { isActive: false, expirationDate: null, unlockPassword: 'licenciavelvetsoftware' };
 }
 
 export async function guardarLicencia(config: any): Promise<void> {
@@ -170,7 +175,14 @@ export async function guardarLicencia(config: any): Promise<void> {
 export async function cargarConfigSeguridad(): Promise<any> {
   // Siempre lo guardaremos en localStorage de momento sin subirlo a capa SQLite
   const s = localStorage.getItem('securityConfig');
-  return s ? JSON.parse(s) : { masterPassword: 'AMCRJR', ratesPassword: 'AMCRJR', specialRatesPassword: 'AMCRJR' };
+  if (s) {
+    const parsed = JSON.parse(s);
+    if (parsed.masterPassword === 'AMCRJR' || parsed.masterPassword === 'admin' || parsed.masterPassword === 'adminvelvetsoftware') parsed.masterPassword = 'adminvelvet';
+    if (parsed.ratesPassword === 'AMCRJR' || parsed.ratesPassword === 'admin' || parsed.ratesPassword === 'tarifasvelvetsoftware') parsed.ratesPassword = 'tarifasvelvet';
+    if (parsed.specialRatesPassword === 'AMCRJR' || parsed.specialRatesPassword === 'admin' || parsed.specialRatesPassword === 'tarifasespecialesvelvetsoftware') parsed.specialRatesPassword = 'tarifasespecialesvelvet';
+    return parsed;
+  }
+  return { masterPassword: 'adminvelvet', ratesPassword: 'tarifasvelvet', specialRatesPassword: 'tarifasespecialesvelvet' };
 }
 
 export async function guardarConfigSeguridad(config: any): Promise<void> {

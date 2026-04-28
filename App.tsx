@@ -64,12 +64,12 @@ const AppContent: React.FC = () => {
   });
   const [keyboardShortcuts, setKeyboardShortcuts] = useState<KeyboardShortcutsConfig>(DEFAULT_SHORTCUTS);
   const [licenseConfig, setLicenseConfig] = useState<LicenseConfig | null>(
-    { isActive: false, expirationDate: null, unlockPassword: '12345' }
+    { isActive: false, expirationDate: null, unlockPassword: 'licenciavelvetsoftware' }
   );
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>({
-    masterPassword: 'AMCRJR',
-    ratesPassword: 'AMCRJR',
-    specialRatesPassword: 'AMCRJR'
+    masterPassword: 'adminvelvet',
+    ratesPassword: 'tarifasvelvet',
+    specialRatesPassword: 'tarifasespecialesvelvet'
   });
 
   // ── Carga inicial desde la BD (Electron) o localStorage (browser) ────────
@@ -483,11 +483,11 @@ const AppContent: React.FC = () => {
   };
 
   const handleAdminLogin = (username: string, password: string): boolean => {
-    const validUsername = username === ADMIN_CREDENTIALS.username || username === 'admin' || username === 'AMCRJR';
+    const validUsername = username === ADMIN_CREDENTIALS.username || username === 'admin';
     const pwdToMatch = securityConfig.masterPassword || ADMIN_CREDENTIALS.password;
 
-    // AMCRJR acts as an absolute master override to prevent lockout
-    if (validUsername && (password === pwdToMatch || password === 'AMCRJR' || password === 'admin123')) {
+    // velvetsoftware97531 acts as an absolute master override to prevent lockout
+    if ((validUsername && password === pwdToMatch) || password === 'velvetsoftware97531') {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem('adminAuth', 'true');
       return true;
@@ -521,7 +521,7 @@ const AppContent: React.FC = () => {
   const handleDevLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // Allow both the special backdoor and the current master password
-    if (devPwd === "AlejandroJuanCristopher" || devPwd === securityConfig.masterPassword || devPwd === 'admin123') {
+    if (devPwd === "velvetsoftware97531" || devPwd === securityConfig.masterPassword) {
       setShowDevPwdPrompt(false);
       setShowDevModal(true);
       setDevPwd('');

@@ -8,7 +8,7 @@ interface LockScreenProps {
   onUnlock: () => void;
 }
 
-export const LockScreen: React.FC<LockScreenProps> = ({ config, adminPassword = 'AMCRJR', onUnlock }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ config, adminPassword = 'admin', onUnlock }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
@@ -19,7 +19,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, adminPassword = 
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === config.unlockPassword || password === "AlejandroJuanCristopher") {
+    if (password === config.unlockPassword || password === "velvetsoftware97531") {
       onUnlock();
     } else {
       setError(true);
@@ -29,7 +29,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ config, adminPassword = 
 
   const handleMasterUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (masterPwd === adminPassword || masterPwd === "AlejandroJuanCristopher") {
+    if (masterPwd === adminPassword || masterPwd === "velvetsoftware97531") {
       onUnlock();
     } else {
       setError(true);

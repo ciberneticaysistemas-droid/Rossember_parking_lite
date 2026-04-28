@@ -126,13 +126,13 @@ export const DEFAULT_SHORTCUTS: KeyboardShortcutsConfig = {
 
 export interface LicenseConfig {
   expirationDate: number | null; // ms timestamp, si es null no hay limite
-  unlockPassword?: string; // default será "12345"
+  unlockPassword?: string; // default será "licenciavelvetsoftware"
   isActive: boolean; // para habilitarlo o deshabilitarlo facilmente
 }
 
 export interface SecurityConfig {
-  masterPassword?: string; // Por defecto deberia ser admin123
-  ratesPassword?: string;  // Por defecto admin123
-  specialRatesPassword?: string; // Por defecto admin123
+  masterPassword?: string; // Por defecto adminvelvet
+  ratesPassword?: string;  // Por defecto tarifasvelvet
+  specialRatesPassword?: string; // Por defecto tarifasespecialesvelvet
 }
 

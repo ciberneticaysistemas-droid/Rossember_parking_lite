@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS configuracion_licencia (
     activa                  INTEGER NOT NULL DEFAULT 0, -- 0=NO bloquea, 1=SÍ bloquea
     -- Fecha de expiración en milisegundos Unix (igual que Date.now() en JS)
     fecha_expiracion        INTEGER,          -- NULL = sin límite
-    contrasena_desbloqueo   TEXT    DEFAULT '12345'
+    contrasena_desbloqueo   TEXT    DEFAULT 'licenciavelvetsoftware'
 );
 
 -- ============================================================

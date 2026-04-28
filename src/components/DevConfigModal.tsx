@@ -12,7 +12,7 @@ export const DevConfigModal: React.FC<DevConfigModalProps> = ({ currentConfig, o
   const [config, setConfig] = useState<LicenseConfig>(currentConfig || {
     isActive: false,
     expirationDate: null,
-    unlockPassword: '12345'
+    unlockPassword: 'licenciavelvetsoftware'
   });
 
   const [dateStr, setDateStr] = useState<string>(() => {
@@ -31,7 +31,7 @@ export const DevConfigModal: React.FC<DevConfigModalProps> = ({ currentConfig, o
     onSave({
       ...config,
       expirationDate: expTime,
-      unlockPassword: config.unlockPassword || '12345'
+      unlockPassword: config.unlockPassword || 'licenciavelvetsoftware'
     });
     onClose();
   };

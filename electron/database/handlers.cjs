@@ -309,13 +309,14 @@ function registerHandlers(ipcMain) {
 
   ipcMain.handle('db:licencia:obtener', () => {
     const row = getDatabase().prepare('SELECT * FROM configuracion_licencia WHERE id_parqueadero=?').get(PARK_ID);
-    if (!row) return { isActive: false, expirationDate: null, unlockPassword: '12345' };
-    return { isActive: row.activa===1, expirationDate: row.fecha_expiracion||null, unlockPassword: row.contrasena_desbloqueo||'12345' };
+    if (!row) return { isActive: false, expirationDate: null, unlockPassword: 'licenciavelvetsoftware' };
+    const unlockPwd = (row.contrasena_desbloqueo === '12345') ? 'licenciavelvetsoftware' : (row.contrasena_desbloqueo || 'licenciavelvetsoftware');
+    return { isActive: row.activa===1, expirationDate: row.fecha_expiracion||null, unlockPassword: unlockPwd };
   });
 
   ipcMain.handle('db:licencia:actualizar', (_e, c) => {
     getDatabase().prepare(`UPDATE configuracion_licencia SET activa=?,fecha_expiracion=?,contrasena_desbloqueo=? WHERE id_parqueadero=?`)
-      .run(c.isActive?1:0, c.expirationDate||null, c.unlockPassword||'12345', PARK_ID);
+      .run(c.isActive?1:0, c.expirationDate||null, c.unlockPassword||'licenciavelvetsoftware', PARK_ID);
     return { ok: true };
   });
 
